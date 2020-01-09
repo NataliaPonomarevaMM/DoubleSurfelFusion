@@ -9,6 +9,16 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# FOR SMPL
+set(xtensor_DIR  /home/nponomareva/usr/local/lib/cmake/xtensor)
+set(xtl_DIR  /home/nponomareva/usr/local/lib/cmake/xtl)
+set(nlohmann_json_DIR  /home/nponomareva/usr/local/lib/cmake/nlohmann_json)
+include_directories(/usr/local/include)
+find_package(xtensor REQUIRED)
+find_package(nlohmann_json REQUIRED)
+
+include_directories(${GLEW_INCLUDE_DIRS} ${xtensor_INCLUDE_DIRS})
+
 # Cuda
 find_package(CUDA 9 REQUIRED)
 include_directories(${CUDA_INCLUDE_DIRS})

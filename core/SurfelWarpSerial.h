@@ -21,6 +21,7 @@
 #include "core/geometry/WarpFieldExtender.h"
 #include "core/warp_solver/WarpSolver.h"
 #include "core/warp_solver/RigidSolver.h"
+#include "core/smpl/smpl.h"
 
 #include <boost/filesystem.hpp>
 
@@ -31,7 +32,10 @@ namespace surfelwarp {
 		//The primary components
 		ImageProcessor::Ptr m_image_processor;
 		Renderer::Ptr m_renderer;
-		
+
+		//SMPL Model
+		smpl::SMPL m_smpl_model;
+
 		//The surfel geometry and their updater
 		SurfelGeometry::Ptr m_surfel_geometry[2];
 		int m_updated_geometry_index;
