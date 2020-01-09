@@ -1,9 +1,9 @@
 {
     "clip_far":1300,
     "clip_near":10,
-    "data_prefix":"/home/wei/Documents/programs/surfelwarp/test_data/boxing",
+    "data_prefix":"/home/nponomareva/data/VolumeDeformData/boxing/data",
     "depth_focal_x":570.0,"depth_focal_y":570.0,"depth_principal_x":320.0,"depth_principal_y":240.0,
-    "gpc_model_path":"/home/wei/Documents/programs/surfelwarp/test_data/sintel_small_speed",
+    "gpc_model_path":"/home/nponomareva/data/sintel_small_speeds.dms",
     "image_cols":640,"image_rows":480,
     "start_frame":0,
     "num_frame":310,

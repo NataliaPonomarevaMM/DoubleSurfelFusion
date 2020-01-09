@@ -2,6 +2,7 @@
 #define SMPL_H
 
 #include <string>
+#include <tuple>
 #include "core/smpl/def.h"
 
 namespace smpl {
