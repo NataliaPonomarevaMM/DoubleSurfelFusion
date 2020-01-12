@@ -13,10 +13,26 @@
 
 #include <thread>
 #include <fstream>
+#include <nlohmann/json.hpp>
 
 surfelwarp::SurfelWarpSerial::SurfelWarpSerial() {
 	//The config is assumed to be updated
 	const auto& config = ConfigParser::Instance();
+
+	//The SMPL model
+    std::string model_path = "/home/nponomareva/DoubleFusion/data/smpl_female.json";
+    m_smpl_model.init(model_path);
+    nlohmann::json tb_data; // JSON object represents.
+    std::string hmr_path = "/home/nponomareva/data/hmr_results/hmr_data.json";
+    std::ifstream file(hmr_path);
+    file >> tb_data;
+    for (int i = 0; i < 72; i++)
+        m_theta[i] = tb_data["arr"].data()[i+3];
+    for (int i = 0; i < 10; i++)
+        m_beta[i] = tb_data["arr"].data()[i+75];
+
+    //TEST
+    model.lbs_for_model(beta, theta);
 	
 	//Construct the image processor
 	FetchInterface::Ptr fetcher = std::make_shared<GenericFileFetch>(config.data_path());

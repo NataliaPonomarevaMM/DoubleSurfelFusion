@@ -35,8 +35,9 @@ namespace surfelwarp {
 
 		//SMPL Model
 		smpl::SMPL m_smpl_model;
+        float m_theta[72], m_beta[10];
 
-		//The surfel geometry and their updater
+        //The surfel geometry and their updater
 		SurfelGeometry::Ptr m_surfel_geometry[2];
 		int m_updated_geometry_index;
 		LiveGeometryUpdater::Ptr m_live_geometry_updater;
