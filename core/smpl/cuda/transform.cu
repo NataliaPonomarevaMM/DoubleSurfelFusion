@@ -4,11 +4,12 @@
 
 namespace smpl {
     namespace device {
-        __global__ void LocalTransform(float *joints, int64_t *kinematicTree, float *poseRotation,
-                                       float *localTransformations) {
-            // joints [jointnum][3]
-            // poseRotHomo [JOINTS_NUM][4][3]
-            // kinematicTree [2][jointnum]
+        __global__ void LocalTransform(
+                const PtrSz<const float> joints,
+                const PtrSz<const int64_t> kinematicTree,
+                const PtrSz<const float>poseRotation,
+                PtrSz<float>localTransformations
+        ) {
             int i = threadIdx.x;
             //copy data from poseRotation
             for (int k = 0; k < 3; k++)
@@ -24,10 +25,12 @@ namespace smpl {
         }
 
 
-        __global__ void
-        GlobalTransform(float *localTransformations, int64_t *kinematicTree, int jointnum,
-                        float *globalTransformations) {
-            //global transformations [N][24][4][4]
+        __global__ void GlobalTransform(
+                const PtrSz<const float> localTransformations,
+                const PtrSz<const int64_t>kinematicTree,
+                const int jointnum,
+                PtrSz<float>globalTransformations
+        ) {
             for (int k = 0; k < 4; k++)
                 for (int l = 0; l < 4; l++)
                     globalTransformations[k * 4 + l] = localTransformations[k * 4 + l];
@@ -45,7 +48,10 @@ namespace smpl {
             }
         }
 
-        __global__ void Transform(float *globalTransformations, float *joints) {
+        __global__ void Transform(
+                const PtrSz<const float>joints
+                PtrSz<float>globalTransformations
+        ) {
             int j = threadIdx.x;
 
             float elim[3];
@@ -59,16 +65,16 @@ namespace smpl {
         }
     }
 
-    float *SMPL::transform(float *d_poseRotation, float *d_joints) {
-        float *d_localTransformations, *d_globalTransformations;
-        cudaMalloc((void **) &d_localTransformations, JOINT_NUM * 16 * sizeof(float));
-        cudaMalloc((void **) &d_globalTransformations, JOINT_NUM * 16 * sizeof(float));
+    void SMPL::transform(
+            const DeviceArray<float> &d_poseRotation,
+            const DeviceArray<float> &d_joints,
+            DeviceArray<float> &d_globalTransformations
+    ) {
+        DeviceArray<float> d_localTransformations(DeviceArray<float>(JOINT_NUM * 16));
 
         device::LocalTransform<<<1,JOINT_NUM>>>(d_joints, d_kinematicTree, d_poseRotation, d_localTransformations);
         device::GlobalTransform<<<1,1>>>(d_localTransformations, d_kinematicTree, JOINT_NUM, d_globalTransformations);
-        device::Transform<<<1,JOINT_NUM>>>(d_globalTransformations, d_joints);
-
-        cudaFree(d_localTransformations);
-        return d_globalTransformations;
+        device::Transform<<<1,JOINT_NUM>>>(d_joints, d_globalTransformations);
+        d_localTransformations.release();
     }
 }

@@ -1,11 +1,17 @@
 #include <cmath>
 #include "core/smpl/def.h"
 #include "core/smpl/smpl.h"
+#include "common/common_types.h"
 
 namespace smpl {
     namespace device {
-        __global__ void FindKNN1(float *templateRestShape, float *shapeBlendShape, int vertexnum, float *curvertices,
-                                 float *dist) {
+        __global__ void FindKNN1(
+                const PtrSz<const float> templateRestShape,
+                const PtrSz<const float> shapeBlendShape,
+                const int vertexnum,
+                const PtrSz<const float> curvertices,
+                PtrSz<float> dist
+        ) {
             int i = blockIdx.x;
             int j = threadIdx.x;
             int ind = i * vertexnum + j;
@@ -16,11 +22,13 @@ namespace smpl {
             }
         }
 
-        __global__ void FindKNN2(float *dist, int vertexnum,
-                                 int *ind) {
+        __global__ void FindKNN2(
+                const PtrSz<const float>dist,
+                const int vertexnum,
+                PtrSz<int> ind
+        ) {
             int i = threadIdx.x;
 
-            //sort them
             ind[i * 4 + 0] = 0;
             ind[i * 4 + 1] = 1;
             ind[i * 4 + 2] = 2;
@@ -45,8 +53,14 @@ namespace smpl {
                     }
         }
 
-        __global__ void CalculateWeights(float *dist, float *weights, int *ind, int jointnum, int vertexnum,
-                                         float *new_weights) {
+        __global__ void CalculateWeights(
+                const PtrSz<const float> dist,
+                const PtrSz<const float> weights,
+                const PtrSz<const int> ind,
+                const int jointnum,
+                const int vertexnum,
+                PtrSz<float>new_weights
+        ) {
             int j = threadIdx.x; // num of weight
             int i = blockIdx.x; // num of vertex
 
@@ -61,33 +75,30 @@ namespace smpl {
         }
     }
 
-    // linear blend skinning for vertex [vertnum][3]
-    float *SMPL::lbs_for_custom_vertices(float *beta, float *theta, float *vertices, int vertnum) {
-        auto d_shapeBlendShape = shapeBlendShape(beta);
+    DeviceArray<float> SMPL::lbs_for_custom_vertices(
+            const DeviceArray<float> &beta,
+            const DeviceArray<float> &theta,
+            const DeviceArray<float> &d_vertices
+    ) {
+        DeviceArray<float> d_shapeBlendShape(DeviceArray<float>(VERTEX_NUM * 3));
+        DeviceArray<float> d_dist(DeviceArray<float>(d_vertices.size() * VERTEX_NUM));
+        DeviceArray<int> d_ind(DeviceArray<int>(d_vertices.size() * 4));
+        DeviceArray<float> d_cur_weights(DeviceArray<float>(d_vertices.size() * JOINT_NUM));
+        DeviceArray<float> d_result_vertices(DeviceArray<float>(d_vertices.size() * 3));
 
-        float *d_dist;
-        cudaMalloc((void **) &d_dist, vertnum * VERTEX_NUM * sizeof(float));
-        int *d_ind;
-        cudaMalloc((void **) &d_ind, vertnum * 4 * sizeof(int));
-        float *d_vertices;
-        cudaMalloc((void **) &d_vertices, vertnum * 3 * sizeof(float));
-        cudaMemcpy(d_vertices, vertices, vertnum * 3 * sizeof(float), cudaMemcpyHostToDevice);
-        float *d_cur_weights;
-        cudaMalloc((void **) &d_cur_weights, vertnum * JOINT_NUM * sizeof(float));
-
+        shapeBlendShape(beta, d_shapeBlendShape);
         // find k nearest neigbours
         device::FindKNN1<<<vertnum,VERTEX_NUM>>>(d_templateRestShape, d_shapeBlendShape, VERTEX_NUM, d_vertices, d_dist);
         device::FindKNN2<<<1,vertnum>>>(d_dist, VERTEX_NUM, d_ind);
-        //now we can calculate weights
+        // calculate weights
         device::CalculateWeights<<<vertnum,JOINT_NUM>>>(d_dist, d_weights, d_ind,  JOINT_NUM, VERTEX_NUM, d_cur_weights);
-        cudaFree(d_shapeBlendShape);
-        cudaFree(d_dist);
-        cudaFree(d_ind);
+        run(beta, theta, d_cur_weights, d_result_vertices, d_vertices);
 
-        auto res = run(beta, theta, d_cur_weights, d_vertices, 1);
-        cudaFree(d_cur_weights);
-        cudaFree(d_vertices);
+        d_shapeBlendShape.release();
+        d_dist.release();
+        d_ind.release();
+        d_cur_weights.release();
 
-        return res;
+        return d_result_vertices;
     }
 }

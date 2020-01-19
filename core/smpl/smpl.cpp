@@ -7,42 +7,70 @@
 #include "core/smpl/def.h"
 
 namespace smpl {
-    SMPL::SMPL() :
-            d_poseBlendBasis(nullptr),
-            d_shapeBlendBasis(nullptr),
-            d_templateRestShape(nullptr),
-            d_jointRegressor(nullptr),
-            d_weights(nullptr),
-            d_kinematicTree(nullptr)
-    {
-    }
-
-    void SMPL::init(std::string &modelPath) {
+    SMPL::SMPL(std::string &modelPath) {
         nlohmann::json model; // JSON object represents.
         std::ifstream file(modelPath);
         file >> model;
 
-        // blender
-        xt::xarray<float> shapeBlendBasis;
-        xt::xarray<float> poseBlendBasis;
-        xt::from_json(model["shape_blend_shapes"], shapeBlendBasis);
-        xt::from_json(model["pose_blend_shapes"], poseBlendBasis);
+        auto shapeBlendBasis = model["shape_blend_shapes"].get<std::vector<float>>();
+        auto poseBlendBasis = model["pose_blend_shapes"].get<std::vector<float>>();
+        auto templateRestShape = model["vertices_template"].get<std::vector<float>>();
+        auto jointRegressor = model["joint_regressor"].get<std::vector<float>>();
+        auto kinematicTree = model["kinematic_tree"].get<std::vector<int64_t>>();
+        auto weights = model["weights"].get<std::vector<float>>();
 
-        // regressor
-        xt::xarray<float> templateRestShape;
-        xt::xarray<float> jointRegressor;
-        xt::from_json(model["vertices_template"], templateRestShape);
-        xt::from_json(model["joint_regressor"], jointRegressor);
+        d_poseBlendBasis = DeviceArray<float>(poseBlendBasis.data(), VERTEX_NUM * 3 * POSE_BASIS_DIM);
+        d_shapeBlendBasis = DeviceArray<float>(shapeBlendBasis.data(), VERTEX_NUM * 3 * SHAPE_BASIS_DIM);
+        d_templateRestShape = DeviceArray<float>(templateRestShape.data(), VERTEX_NUM * 3);
+        d_jointRegressor = DeviceArray<float>(jointRegressor.data(), JOINT_NUM * VERTEX_NUM);
+        d_weights = DeviceArray<float>(weights.data(), VERTEX_NUM * JOINT_NUM);
+        d_kinematicTree = DeviceArray<int64_t>(kinematicTree.data(), 2 * JOINT_NUM);
+    }
 
-        // transformer
-        xt::xarray<int64_t> kinematicTree;
-        xt::from_json(model["kinematic_tree"], kinematicTree);
+    SMPL::~SMPL() {
+        d_poseBlendBasis.release();
+        d_shapeBlendBasis.release();
+        d_templateRestShape.release();
+        d_jointRegressor.release();
+        d_weights.release();
+        d_kinematicTree.release();
+    }
 
-        // skinner
-        xt::xarray<float> weights;
-        xt::from_json(model["weights"], weights);
+    void SMPL::run(
+            const DeviceArray<float> &beta,
+            const DeviceArray<float> &theta,
+            const DeviceArray<float> &d_custom_weights,
+            DeviceArray<float> &d_result_vertices,
+            const DeviceArray<float> &d_vertices
+    ) {
+        DeviceArray<float> d_poseRotation(DeviceArray<float>(JOINT_NUM * 9));
+        DeviceArray<float> d_restPoseRotation(DeviceArray<float>(theta, JOINT_NUM * 9));
+        DeviceArray<float> d_poseBlendShape(DeviceArray<float>(theta, VERTEX_NUM * 3));
+        DeviceArray<float> d_shapeBlendShape(DeviceArray<float>(VERTEX_NUM * 3));
+        DeviceArray<float> d_restShape(DeviceArray<float>(VERTEX_NUM * 3));
+        DeviceArray<float> d_joints(DeviceArray<float>(JOINT_NUM * 3));
+        DeviceArray<float> d_globalTransformations(DeviceArray<float>(JOINT_NUM * 16));
 
-        loadToDevice(shapeBlendBasis.data(), poseBlendBasis.data(), templateRestShape.data(),
-                jointRegressor.data(), kinematicTree.data(), weights.data());
+        if (d_vertices == nullptr)
+            d_vertices = d_restShape;
+
+        poseBlendShape(theta, d_poseRotation, d_restPoseRotation, d_poseBlendShape);
+        shapeBlendShape(beta, d_shapeBlendShape);
+        regressJoints(d_shapeBlendShape, d_poseBlendShape, d_restShape, d_joints);
+        transform(d_poseRotation, d_joints, d_globalTransformations);
+        skinning(d_globalTransformations, d_custom_weights, d_vertices, d_result_vertices);
+
+        d_shapeBlendShape.release();
+        d_poseBlendShape.release();
+        d_poseRotation.release();
+        d_joints.release();
+        d_restShape.release();
+        d_globalTransformations.release();
+    }
+
+    DeviceArray<float> SMPL::lbs_for_model(const DeviceArray<float> &beta, const DeviceArray<float> &theta) {
+        DeviceArray<float> d_result_vertices(DeviceArray<float>(VERTEX_NUM * 3));
+        run(beta, theta, d_weights, d_result_vertices);
+        return d_result_vertices;
     }
 } // namespace smpl

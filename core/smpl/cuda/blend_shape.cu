@@ -4,8 +4,11 @@
 
 namespace smpl {
     namespace device {
-        __global__ void PoseBlend1(float *theta,
-                                   float *poseRotation, float *restPoseRotation) {
+        __global__ void PoseBlend1(
+                const PtrSz<const float> theta,
+                PtrSz<float> poseRotation,
+                PtrSz<float> restPoseRotation
+        ) {
             int j = threadIdx.x;
 
             int ind = j * 3;
@@ -51,9 +54,12 @@ namespace smpl {
             restPoseRotation[ind + 8] = 1;
         }
 
-        __global__ void
-        PoseBlend2(float *poseRotation, float *poseBlendBasis, float *restPoseRotation,
-                   float *poseBlendShape) {
+        __global__ void PoseBlend2(
+                const PtrSz<const float> poseRotation,
+                const PtrSz<const float> poseBlendBasis,
+                const PtrSz<const float> restPoseRotation,
+                PtrSz<float> poseBlendShape
+        ) {
             int j = blockIdx.x;
             int k = threadIdx.x;
 
@@ -64,8 +70,12 @@ namespace smpl {
                         poseBlendBasis[ind * 207 + l];
         }
 
-        __global__ void ShapeBlend(float *beta, float *shapeBlendBasis, int shapebasisdim,
-                                   float *shapeBlendShape) {
+        __global__ void ShapeBlend(
+                const PtrSz<const float> beta,
+                const PtrSz<const float> shapeBlendBasis,
+                const int shapebasisdim,
+                PtrSz<float> shapeBlendShape
+        ) {
             int j = blockIdx.x;
             int k = threadIdx.x;
 
@@ -76,29 +86,20 @@ namespace smpl {
         }
     }
 
-    std::tuple<float *, float *, float *> SMPL::poseBlendShape(float *theta) {
-        float *d_theta, *d_poseRotation, *d_restPoseRotation, *d_poseBlendShape;
-        cudaMalloc((void **) &d_theta, JOINT_NUM * 3 * sizeof(float));
-        cudaMalloc((void **) &d_poseRotation, JOINT_NUM * 9 * sizeof(float));
-        cudaMalloc((void **) &d_restPoseRotation, JOINT_NUM * 9 * sizeof(float));
-        cudaMalloc((void **) &d_poseBlendShape, VERTEX_NUM * 3 * sizeof(float));
-        cudaMemcpy(d_theta, theta, JOINT_NUM * 3 * sizeof(float), cudaMemcpyHostToDevice);
-
+    void SMPL::poseBlendShape(
+            const DeviceArray<float> &theta,
+            DeviceArray<float> &d_poseRotation,
+            DeviceArray<float> &d_restPoseRotation,
+            DeviceArray<float> &d_poseBlendShape) {
+//        DeviceArray<float> d_theta(DeviceArray<float>(theta, JOINT_NUM * 3));
         device::PoseBlend1<<<1,JOINT_NUM>>>(d_theta, d_poseRotation, d_restPoseRotation);
         device::PoseBlend2<<<VERTEX_NUM,3>>>(d_poseRotation, d_poseBlendBasis, d_restPoseRotation, d_poseBlendShape);
-        cudaFree(d_theta);
-
-        return {d_poseRotation, d_restPoseRotation, d_poseBlendShape};
     }
 
-    float *SMPL::shapeBlendShape(float *beta) {
-        float *d_beta, *d_shapeBlendShape;
-        cudaMalloc((void **) &d_beta, SHAPE_BASIS_DIM * sizeof(float));
-        cudaMalloc((void **) &d_shapeBlendShape, VERTEX_NUM * 3 * sizeof(float));
-        cudaMemcpy(d_beta, beta, SHAPE_BASIS_DIM * sizeof(float), cudaMemcpyHostToDevice);
-
+    void SMPL::shapeBlendShape(
+            const DeviceArray<float> &beta,
+            DeviceArray<float> &d_shapeBlendShape) {
+//        DeviceArray<float> d_beta(DeviceArray<float>(beta, SHAPE_BASIS_DIM));
         device::ShapeBlend<<<VERTEX_NUM,3>>>(d_beta, d_shapeBlendBasis, SHAPE_BASIS_DIM, d_shapeBlendShape);
-        cudaFree(d_beta);
-        return d_shapeBlendShape;
     }
 }

@@ -4,12 +4,14 @@
 
 namespace smpl {
     namespace device {
-        __global__ void
-        Skinning(float *restShape, float *transformation, float *weights, int vertexnum, int jointnum,
-                 float *vertices) {
-            //restShape [vertexnum][3]
-            //transformation [jointnum][4][4]
-            //weights [vertexnum][jointnum]
+        __global__ void Skinning(
+                const PtrSz<const float> restShape,
+                const PtrSz<const float> transformation,
+                const PtrSz<const float> weights,
+                const int vertexnum,
+                const int jointnum,
+                PtrSz<float> vertices
+        ) {
             int j = threadIdx.x;
 
             float coeffs[16] = {0};
@@ -30,17 +32,13 @@ namespace smpl {
         }
     }
 
-    float *SMPL::skinning(float *d_transformation, float *d_custom_weights, float *d_vertices, float vertexnum) {
-        ///SKINNING
-        float *d_res_vertices;
-        cudaMalloc((void **) &d_res_vertices, vertexnum * 3 * sizeof(float));
-
+    void SMPL::skinning(
+            const DeviceArray<float> &d_transformation,
+            const DeviceArray<float> &d_custom_weights,
+            const DeviceArray<float> &d_vertices,
+            DeviceArray<float> &d_result_vertices
+    ) {
         device::Skinning<<<1,VERTEX_NUM>>>(d_vertices, d_transformation, d_custom_weights,
-                vertexnum, JOINT_NUM, d_res_vertices);
-
-        float *result_vertices = (float *)malloc(vertexnum * 3 * sizeof(float));
-        cudaMemcpy(result_vertices, d_res_vertices, vertexnum * 3 * sizeof(float), cudaMemcpyDeviceToHost);
-        cudaFree(d_res_vertices);
-        return result_vertices;
+                d_vertices.size(), JOINT_NUM, d_result_vertices);
     }
 }
