@@ -2,7 +2,7 @@
 #include "core/smpl/def.h"
 #include "core/smpl/smpl.h"
 
-namespace smpl {
+namespace surfelwarp {
     namespace device {
         __global__ void PoseBlend1(
                 const PtrSz<const float> theta,
@@ -16,19 +16,19 @@ namespace smpl {
                     theta[ind] * theta[ind] + theta[ind + 1] * theta[ind + 1] + theta[ind + 2] * theta[ind + 2]);
             float sin = std::sin(norm);
             float cos = std::cos(norm);
-            theta[ind] /= norm;
-            theta[ind + 1] /= norm;
-            theta[ind + 2] /= norm; // axes
+            float t0 = theta[ind] / norm;
+            float t1 = theta[ind + 1] / norm;
+            float t2 = theta[ind + 2] / norm; // axes
 
             float skew[9];
             skew[0] = 0;
-            skew[1] = -1 * theta[ind + 2];
-            skew[2] = theta[ind + 1];
-            skew[3] = theta[ind + 2];
+            skew[1] = -1 * t2;
+            skew[2] = t1;
+            skew[3] = t2;
             skew[4] = 0;
-            skew[5] = -1 * theta[ind];
-            skew[6] = -1 * theta[ind + 1];
-            skew[7] = theta[ind];
+            skew[5] = -1 * t0;
+            skew[6] = -1 * t1;
+            skew[7] = t0;
             skew[8] = 0;
 
             ind = ind * 3;
@@ -92,7 +92,7 @@ namespace smpl {
             DeviceArray<float> &d_restPoseRotation,
             DeviceArray<float> &d_poseBlendShape) {
 //        DeviceArray<float> d_theta(DeviceArray<float>(theta, JOINT_NUM * 3));
-        device::PoseBlend1<<<1,JOINT_NUM>>>(d_theta, d_poseRotation, d_restPoseRotation);
+        device::PoseBlend1<<<1,JOINT_NUM>>>(theta, d_poseRotation, d_restPoseRotation);
         device::PoseBlend2<<<VERTEX_NUM,3>>>(d_poseRotation, d_poseBlendBasis, d_restPoseRotation, d_poseBlendShape);
     }
 
@@ -100,6 +100,6 @@ namespace smpl {
             const DeviceArray<float> &beta,
             DeviceArray<float> &d_shapeBlendShape) {
 //        DeviceArray<float> d_beta(DeviceArray<float>(beta, SHAPE_BASIS_DIM));
-        device::ShapeBlend<<<VERTEX_NUM,3>>>(d_beta, d_shapeBlendBasis, SHAPE_BASIS_DIM, d_shapeBlendShape);
+        device::ShapeBlend<<<VERTEX_NUM,3>>>(beta, d_shapeBlendBasis, SHAPE_BASIS_DIM, d_shapeBlendShape);
     }
 }

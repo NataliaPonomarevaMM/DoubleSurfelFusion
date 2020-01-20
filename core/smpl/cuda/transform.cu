@@ -2,7 +2,7 @@
 #include "core/smpl/def.h"
 #include "core/smpl/smpl.h"
 
-namespace smpl {
+namespace surfelwarp {
     namespace device {
         __global__ void LocalTransform(
                 const PtrSz<const float> joints,
@@ -49,8 +49,8 @@ namespace smpl {
         }
 
         __global__ void Transform(
-                const PtrSz<const float>joints
-                PtrSz<float>globalTransformations
+                const PtrSz<const float> joints,
+                PtrSz<float> globalTransformations
         ) {
             int j = threadIdx.x;
 

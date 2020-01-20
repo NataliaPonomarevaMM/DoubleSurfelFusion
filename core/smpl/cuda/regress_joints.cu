@@ -2,7 +2,7 @@
 #include "core/smpl/def.h"
 #include "core/smpl/smpl.h"
 
-namespace smpl {
+namespace surfelwarp {
     namespace device {
         __global__ void RegressJoints1(
                 const PtrSz<const float> templateRestShape,

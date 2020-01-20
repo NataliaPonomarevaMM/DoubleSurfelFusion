@@ -6,7 +6,7 @@
 #include "core/smpl/def.h"
 #include "common/common_types.h"
 
-namespace smpl {
+namespace surfelwarp {
     class SMPL {
     private:
         ///GPU
@@ -40,20 +40,22 @@ namespace smpl {
                 const DeviceArray<float> &d_vertices,
                 DeviceArray<float> &d_result_vertices);
 
-        void SMPL::run(
+        void run(
                 const DeviceArray<float> &beta,
                 const DeviceArray<float> &theta,
                 const DeviceArray<float> &d_custom_weights,
                 DeviceArray<float> &d_result_vertices,
-                const DeviceArray<float> &d_vertices = nullptr
-        );
+                const DeviceArray<float> &d_vertices = DeviceArray<float>());
     public:
         // Constructor and Destructor
         SMPL(std::string &modelPath);
         ~SMPL();
         // Run the model with a specific group of beta, theta.
-        DeviceArray<float> SMPL::lbs_for_model(const DeviceArray<float> &beta, const DeviceArray<float> &theta)
-        float *lbs_for_custom_vertices(float *beta, float *theta, float *vertices, int vertnum);
+        DeviceArray<float> lbs_for_model(const DeviceArray<float> &beta, const DeviceArray<float> &theta);
+        DeviceArray<float> lbs_for_custom_vertices(
+            const DeviceArray<float> &beta,
+            const DeviceArray<float> &theta,
+            const DeviceArray<float> &d_vertices);
     };
 } // namespace smpl
 #endif // SMPL_H

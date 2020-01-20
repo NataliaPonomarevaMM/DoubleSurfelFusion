@@ -51,7 +51,7 @@ namespace smpl {
         DeviceArray<float> d_joints(DeviceArray<float>(JOINT_NUM * 3));
         DeviceArray<float> d_globalTransformations(DeviceArray<float>(JOINT_NUM * 16));
 
-        if (d_vertices == nullptr)
+        if (d_vertices.size() == 0)
             d_vertices = d_restShape;
 
         poseBlendShape(theta, d_poseRotation, d_restPoseRotation, d_poseBlendShape);

@@ -3,7 +3,7 @@
 #include "core/smpl/smpl.h"
 #include "common/common_types.h"
 
-namespace smpl {
+namespace surfelwarp {
     namespace device {
         __global__ void FindKNN1(
                 const PtrSz<const float> templateRestShape,
@@ -88,10 +88,10 @@ namespace smpl {
 
         shapeBlendShape(beta, d_shapeBlendShape);
         // find k nearest neigbours
-        device::FindKNN1<<<vertnum,VERTEX_NUM>>>(d_templateRestShape, d_shapeBlendShape, VERTEX_NUM, d_vertices, d_dist);
-        device::FindKNN2<<<1,vertnum>>>(d_dist, VERTEX_NUM, d_ind);
+        device::FindKNN1<<<d_vertices.size(),VERTEX_NUM>>>(d_templateRestShape, d_shapeBlendShape, VERTEX_NUM, d_vertices, d_dist);
+        device::FindKNN2<<<1,d_vertices.size()>>>(d_dist, VERTEX_NUM, d_ind);
         // calculate weights
-        device::CalculateWeights<<<vertnum,JOINT_NUM>>>(d_dist, d_weights, d_ind,  JOINT_NUM, VERTEX_NUM, d_cur_weights);
+        device::CalculateWeights<<<d_vertices.size(),JOINT_NUM>>>(d_dist, d_weights, d_ind,  JOINT_NUM, VERTEX_NUM, d_cur_weights);
         run(beta, theta, d_cur_weights, d_result_vertices, d_vertices);
 
         d_shapeBlendShape.release();
