@@ -47,9 +47,10 @@ namespace surfelwarp {
                 DeviceArray<float> &d_result_vertices,
                 const DeviceArray<float> &d_vertices = DeviceArray<float>());
     public:
-        // Constructor and Destructor
+        using Ptr = std::shared_ptr<SMPL>;
         SMPL(std::string &modelPath);
         ~SMPL();
+        SURFELWARP_NO_COPY_ASSIGN_MOVE(SMPL);
         // Run the model with a specific group of beta, theta.
         DeviceArray<float> lbs_for_model(const DeviceArray<float> &beta, const DeviceArray<float> &theta);
         DeviceArray<float> lbs_for_custom_vertices(
