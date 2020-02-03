@@ -38,9 +38,10 @@ namespace surfelwarp {
             const DeviceArray<float> &d_transformation,
             const DeviceArray<float> &d_custom_weights,
             const DeviceArray<float> &d_vertices,
-            DeviceArray<float> &d_result_vertices
+            DeviceArray<float> &d_result_vertices,
+            cudaStream_t stream
     ) {
-        device::Skinning<<<1,VERTEX_NUM>>>(d_vertices, d_transformation, d_custom_weights,
+        device::Skinning<<<1,VERTEX_NUM,0,stream>>>(d_vertices, d_transformation, d_custom_weights,
                 d_vertices.size(), JOINT_NUM, d_result_vertices);
     }
 }

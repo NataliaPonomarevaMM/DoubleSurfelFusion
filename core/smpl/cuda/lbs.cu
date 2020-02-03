@@ -78,7 +78,8 @@ namespace surfelwarp {
     DeviceArray<float> SMPL::lbs_for_custom_vertices(
             const DeviceArray<float> &beta,
             const DeviceArray<float> &theta,
-            const DeviceArray<float> &d_vertices
+            const DeviceArray<float> &d_vertices,
+            cudaStream_t stream
     ) {
         DeviceArray<float> d_shapeBlendShape(DeviceArray<float>(VERTEX_NUM * 3));
         DeviceArray<float> d_dist(DeviceArray<float>(d_vertices.size() * VERTEX_NUM));
@@ -86,13 +87,13 @@ namespace surfelwarp {
         DeviceArray<float> d_cur_weights(DeviceArray<float>(d_vertices.size() * JOINT_NUM));
         DeviceArray<float> d_result_vertices(DeviceArray<float>(d_vertices.size() * 3));
 
-        shapeBlendShape(beta, d_shapeBlendShape);
+        shapeBlendShape(beta, d_shapeBlendShape, stream);
         // find k nearest neigbours
         device::FindKNN1<<<d_vertices.size(),VERTEX_NUM>>>(d_templateRestShape, d_shapeBlendShape, VERTEX_NUM, d_vertices, d_dist);
         device::FindKNN2<<<1,d_vertices.size()>>>(d_dist, VERTEX_NUM, d_ind);
         // calculate weights
         device::CalculateWeights<<<d_vertices.size(),JOINT_NUM>>>(d_dist, d_weights, d_ind,  JOINT_NUM, VERTEX_NUM, d_cur_weights);
-        run(beta, theta, d_cur_weights, d_result_vertices, d_vertices);
+        run(beta, theta, d_cur_weights, d_result_vertices, stream, d_vertices);
 
         d_shapeBlendShape.release();
         d_dist.release();

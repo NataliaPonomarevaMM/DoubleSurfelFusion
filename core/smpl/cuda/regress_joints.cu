@@ -41,10 +41,12 @@ namespace surfelwarp {
             const DeviceArray<float> &d_shapeBlendShape,
             const DeviceArray<float> &d_poseBlendShape,
             DeviceArray<float> &d_restShape,
-            DeviceArray<float> &d_joints
+            DeviceArray<float> &d_joints,
+            cudaStream_t stream
     ) {
-        device::RegressJoints1<<<VERTEX_NUM,3>>>(d_templateRestShape, d_shapeBlendShape, d_poseBlendShape, d_restShape);
-        device::RegressJoints2<<<JOINT_NUM,3>>>(d_templateRestShape, d_shapeBlendShape, d_jointRegressor,
-                VERTEX_NUM, d_joints);
+        device::RegressJoints1<<<VERTEX_NUM,3,0,stream>>>(d_templateRestShape,
+                d_shapeBlendShape, d_poseBlendShape, d_restShape);
+        device::RegressJoints2<<<JOINT_NUM,3,0,stream>>>(d_templateRestShape,
+                d_shapeBlendShape, d_jointRegressor, VERTEX_NUM, d_joints);
     }
 }

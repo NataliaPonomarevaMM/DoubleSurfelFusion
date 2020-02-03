@@ -70,12 +70,15 @@ namespace surfelwarp {
     void SMPL::transform(
             const DeviceArray<float> &d_poseRotation,
             const DeviceArray<float> &d_joints,
-            DeviceArray<float> &d_globalTransformations
+            DeviceArray<float> &d_globalTransformations,
+            cudaStream_t stream
     ) {
         DeviceArray<float> d_localTransformations = DeviceArray<float>(JOINT_NUM * 16);
 
-        device::LocalTransform<<<1,JOINT_NUM>>>(d_joints, d_kinematicTree, d_poseRotation, d_localTransformations);
-        device::GlobalTransform<<<1,1>>>(d_localTransformations, d_kinematicTree, JOINT_NUM, d_globalTransformations);
-        device::Transform<<<1,JOINT_NUM>>>(d_joints, d_globalTransformations);
+        device::LocalTransform<<<1,JOINT_NUM,0,stream>>>(d_joints, d_kinematicTree,
+                d_poseRotation, d_localTransformations);
+        device::GlobalTransform<<<1,1,0,stream>>>(d_localTransformations, d_kinematicTree,
+                JOINT_NUM, d_globalTransformations);
+        device::Transform<<<1,JOINT_NUM,0,stream>>>(d_joints, d_globalTransformations);
     }
 }

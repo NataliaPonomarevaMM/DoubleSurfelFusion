@@ -25,30 +25,36 @@ namespace surfelwarp {
                 const DeviceArray<float> &theta,
                 DeviceArray<float> &d_poseRotation,
                 DeviceArray<float> &d_restPoseRotation,
-                DeviceArray<float> &d_poseBlendShape);
+                DeviceArray<float> &d_poseBlendShape,
+                cudaStream_t stream);
         void shapeBlendShape(
                 const DeviceArray<float> &beta,
-                DeviceArray<float> &d_shapeBlendShape);
+                DeviceArray<float> &d_shapeBlendShape,
+                cudaStream_t stream);
         void regressJoints(
                 const DeviceArray<float> &d_shapeBlendShape,
                 const DeviceArray<float> &d_poseBlendShape,
                 DeviceArray<float> &d_restShape,
-                DeviceArray<float> &d_joints);
+                DeviceArray<float> &d_joints,
+                cudaStream_t stream);
         void transform(
                 const DeviceArray<float> &d_poseRotation,
                 const DeviceArray<float> &d_joints,
-                DeviceArray<float> &d_globalTransformations);
+                DeviceArray<float> &d_globalTransformations,
+                cudaStream_t stream);
         void skinning(
                 const DeviceArray<float> &d_transformation,
                 const DeviceArray<float> &d_custom_weights,
                 const DeviceArray<float> &d_vertices,
-                DeviceArray<float> &d_result_vertices);
+                DeviceArray<float> &d_result_vertices,
+                cudaStream_t stream);
 
         void run(
                 const DeviceArray<float> &beta,
                 const DeviceArray<float> &theta,
                 const DeviceArray<float> &d_custom_weights,
                 DeviceArray<float> &d_result_vertices,
+                cudaStream_t stream,
                 const DeviceArray<float> &d_vertices = DeviceArray<float>());
     public:
         using Ptr = std::shared_ptr<SMPL>;
@@ -56,11 +62,15 @@ namespace surfelwarp {
         ~SMPL();
         SURFELWARP_NO_COPY_ASSIGN_MOVE(SMPL);
         // Run the model with a specific group of beta, theta.
-        DeviceArray<float> lbs_for_model(const DeviceArray<float> &beta, const DeviceArray<float> &theta);
+        DeviceArray<float> lbs_for_model(
+                const DeviceArray<float> &beta,
+                const DeviceArray<float> &theta,
+                cudaStream_t stream = 0);
         DeviceArray<float> lbs_for_custom_vertices(
             const DeviceArray<float> &beta,
             const DeviceArray<float> &theta,
-            const DeviceArray<float> &d_vertices);
+            const DeviceArray<float> &d_vertices,
+            cudaStream_t stream = 0);
     };
 } // namespace smpl
 #endif // SMPL_H

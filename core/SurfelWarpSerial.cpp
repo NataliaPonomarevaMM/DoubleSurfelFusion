@@ -17,10 +17,7 @@
 #include <nlohmann/json.hpp>
 
 surfelwarp::SurfelWarpSerial::SurfelWarpSerial() {
-	DeviceArray<float> d = DeviceArray<float>(JOINT_NUM * 16);
-	d.release();
-
-	//The config is assumed to be updated
+    //The config is assumed to be updated
 	const auto& config = ConfigParser::Instance();
 
 	//The SMPL model
