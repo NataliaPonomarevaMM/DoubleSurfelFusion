@@ -6,21 +6,17 @@
 #include "common/ConfigParser.h"
 #include "core/SurfelWarpSerial.h"
 #include <boost/filesystem.hpp>
+#include <nlohmann/json.hpp>
 
 int main(int argc, char** argv) {
 	using namespace surfelwarp;
 	
 	//Get the config path
 	std::string config_path;
-	if (argc <= 1) {
-#if defined(WIN32)
-		config_path = "C:/Users/wei/Documents/Visual Studio 2015/Projects/surfelwarp/test_data/boxing_config.json";
-#else
+	if (argc <= 1) 
 		config_path = "/home/wei/Documents/programs/surfelwarp/test_data/boxing_config.json";
-#endif
-	} else {
+	else
 		config_path = std::string(argv[1]);
-	}
 
 	//Parse it
 	auto& config = ConfigParser::Instance();

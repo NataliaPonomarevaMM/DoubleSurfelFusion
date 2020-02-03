@@ -1,3 +1,4 @@
+
 //
 // Created by wei on 3/29/18.
 //
@@ -16,20 +17,24 @@
 #include <nlohmann/json.hpp>
 
 surfelwarp::SurfelWarpSerial::SurfelWarpSerial() {
+	DeviceArray<float> d = DeviceArray<float>(JOINT_NUM * 16);
+	d.release();
+
 	//The config is assumed to be updated
 	const auto& config = ConfigParser::Instance();
 
 	//The SMPL model
-    std::string model_path = "/home/nponomareva/DoubleFusion/data/smpl_female.json";
+    std::string model_path = "/home/nponomareva/DoubleFusion/data/smpl_female2.json";
     std::string hmr_path = "/home/nponomareva/data/hmr_results/hmr_data.json";
-
     m_smpl_model = std::make_shared<SMPL>(model_path);
+    std::cout << "Model loaded\n";
 	nlohmann::json tb_data; // JSON object represents.
 	std::ifstream file(hmr_path);
 	file >> tb_data;
-	auto data_arr = tb_data["arr"].get<std::vector<float>>();
-	m_theta = DeviceArray<float>(data_arr[i+3], 72);
-	m_beta = DeviceArray<float>(data_arr[i+75], 10);
+    std::cout << "HMR results loaded\n";
+	float* data_arr = tb_data["arr"].get<std::vector<std::vector<float>>>()[0].data();
+	m_theta = DeviceArray<float>(data_arr+3, 72);
+	m_beta = DeviceArray<float>(data_arr+75, 10);
 
     //TEST
     m_smpl_model->lbs_for_model(m_beta, m_theta);

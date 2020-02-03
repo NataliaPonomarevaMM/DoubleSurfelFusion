@@ -20,9 +20,6 @@ target_link_libraries(core_lib visualization_lib)
 target_link_libraries(core_lib imgproc_lib)
 target_link_libraries(core_lib solver_lib)
 
-target_link_libraries(core_lib xtensor
-        ${xtensor_blas_LIBRARIES}
-        nlohmann_json::nlohmann_json)
 
 #Link the graphic lib
 target_link_libraries(core_lib glfw)

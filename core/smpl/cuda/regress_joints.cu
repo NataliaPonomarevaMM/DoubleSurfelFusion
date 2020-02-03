@@ -1,6 +1,8 @@
 #include <cmath>
 #include "core/smpl/def.h"
 #include "core/smpl/smpl.h"
+#include "common/common_types.h"
+#include <device_launch_parameters.h>
 
 namespace surfelwarp {
     namespace device {

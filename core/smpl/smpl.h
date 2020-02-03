@@ -3,8 +3,12 @@
 
 #include <string>
 #include <tuple>
+#include <memory>
 #include "core/smpl/def.h"
 #include "common/common_types.h"
+#include "imgproc/ImageProcessor.h"
+#include "imgproc/frameio/VolumeDeformFileFetch.h"
+#include "core/SurfelGeometry.h"
 
 namespace surfelwarp {
     class SMPL {
