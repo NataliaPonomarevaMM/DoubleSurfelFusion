@@ -11,9 +11,11 @@ namespace surfelwarp {
                 PtrSz<float> poseRotation,
                 PtrSz<float> restPoseRotation
         ) {
-            int j = threadIdx.x;
+	    const auto idx = threadIdx.x + blockDim.x * blockIdx.x;
+            int ind = idx * 3;
 
-            int ind = j * 3;
+	    if (ind + 2 >= theta.size || ind * 3 + 8 >= poseRotation.size)
+		return;
             float norm = std::sqrt(
                     theta[ind] * theta[ind] + theta[ind + 1] * theta[ind + 1] + theta[ind + 2] * theta[ind + 2]);
             float sin = std::sin(norm);
@@ -62,11 +64,12 @@ namespace surfelwarp {
                 const PtrSz<const float> restPoseRotation,
                 PtrSz<float> poseBlendShape
         ) {
-            int j = blockIdx.x;
-            int k = threadIdx.x;
+	    const auto ind = threadIdx.x + blockDim.x * blockIdx.x;
+            
+	    if (ind >= poseBlendShape.size)
+		return;
 
-            int ind = j * 3 + k;
-            poseBlendShape[ind] = 0;
+	    poseBlendShape[ind] = 0;
             for (int l = 0; l < 207; l++)
                 poseBlendShape[ind] += (poseRotation[l + 9] - restPoseRotation[l + 9]) *
                         poseBlendBasis[ind * 207 + l];
@@ -78,10 +81,9 @@ namespace surfelwarp {
                 const int shapebasisdim,
                 PtrSz<float> shapeBlendShape
         ) {
-            int j = blockIdx.x;
-            int k = threadIdx.x;
-
-            int ind = j * 3 + k;
+	    const auto ind = threadIdx.x + blockDim.x * blockIdx.x;
+	    if (ind >= .size) 
+    		return;
             shapeBlendShape[ind] = 0;
             for (int l = 0; l < shapebasisdim; l++)
                 shapeBlendShape[ind] += beta[l] * shapeBlendBasis[ind * shapebasisdim + l];// (6890, 3)
@@ -94,14 +96,22 @@ namespace surfelwarp {
             DeviceArray<float> &d_restPoseRotation,
             DeviceArray<float> &d_poseBlendShape,
             cudaStream_t stream) {
-        device::PoseBlend1<<<1,JOINT_NUM,0,stream>>>(theta, d_poseRotation, d_restPoseRotation);
-        device::PoseBlend2<<<VERTEX_NUM,3,0,stream>>>(d_poseRotation, d_poseBlendBasis, d_restPoseRotation, d_poseBlendShape);
+	dim3 blk(1);
+	dim3 grid(divUp(JOINT_NUM, blk.x));
+
+        device::PoseBlend1<<<grid, blk,0,stream>>>(theta, d_poseRotation, d_restPoseRotation);
+        
+	dim3 blk2(3);
+        dim3 grid2(divUp(VERTEX_NUM, blk2.x));
+	device::PoseBlend2<<<grid2,blk2,0,stream>>>(d_poseRotation, d_poseBlendBasis, d_restPoseRotation, d_poseBlendShape);
     }
 
     void SMPL::shapeBlendShape(
             const DeviceArray<float> &beta,
             DeviceArray<float> &d_shapeBlendShape,
             cudaStream_t stream) {
-        device::ShapeBlend<<<VERTEX_NUM,3,0,stream>>>(beta, d_shapeBlendBasis, SHAPE_BASIS_DIM, d_shapeBlendShape);
+	dim3 blk2(3);
+        dim3 grid2(divUp(VERTEX_NUM, blk2.x));
+        device::ShapeBlend<<<grid2,blk2,0,stream>>>(beta, d_shapeBlendBasis, SHAPE_BASIS_DIM, d_shapeBlendShape);
     }
 }

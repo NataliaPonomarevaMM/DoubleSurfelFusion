@@ -92,29 +92,35 @@ namespace surfelwarp {
             cudaStream_t stream,
             const DeviceArray<float> &d_vertices
     ) {
-        DeviceArray<float> d_poseRotation(DeviceArray<float>(JOINT_NUM * 9));
-        DeviceArray<float> d_restPoseRotation(DeviceArray<float>(JOINT_NUM * 9));
-        DeviceArray<float> d_poseBlendShape(DeviceArray<float>(VERTEX_NUM * 3));
-        DeviceArray<float> d_shapeBlendShape(DeviceArray<float>(VERTEX_NUM * 3));
-        DeviceArray<float> d_restShape(DeviceArray<float>(VERTEX_NUM * 3));
-        DeviceArray<float> d_joints(DeviceArray<float>(JOINT_NUM * 3));
-        DeviceArray<float> d_globalTransformations(DeviceArray<float>(JOINT_NUM * 16));
+        DeviceArray<float> d_poseRotation = DeviceArray<float>(JOINT_NUM * 9);
+        DeviceArray<float> d_restPoseRotation = DeviceArray<float>(JOINT_NUM * 9);
+        DeviceArray<float> d_poseBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
+        DeviceArray<float> d_shapeBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
+        DeviceArray<float> d_restShape = DeviceArray<float>(VERTEX_NUM * 3);
+        DeviceArray<float> d_joints = DeviceArray<float>(JOINT_NUM * 3);
+        DeviceArray<float> d_globalTransformations = DeviceArray<float>(JOINT_NUM * 16);
 
-        poseBlendShape(theta, d_poseRotation, d_restPoseRotation, d_poseBlendShape, stream);
+//        poseBlendShape(theta, d_poseRotation, d_restPoseRotation, d_poseBlendShape, stream);
 	    std::cout << "poseblend\n";
-        shapeBlendShape(beta, d_shapeBlendShape, stream);
-	    std::cout << "shapevlend\n";
-        regressJoints(d_shapeBlendShape, d_poseBlendShape, d_restShape, d_joints, stream);
-        std::cout << "regress\n";
-	    transform(d_poseRotation, d_joints, d_globalTransformations, stream);
-	    std::cout << "transform\n";
-
-        if (d_vertices.size() == 0)
-            skinning(d_globalTransformations, d_custom_weights, d_restShape, d_result_vertices, stream);
-        else
-            skinning(d_globalTransformations, d_custom_weights, d_vertices, d_result_vertices, stream);
+//        shapeBlendShape(beta, d_shapeBlendShape, stream);
+//	    std::cout << "shapevlend\n";
+//        regressJoints(d_shapeBlendShape, d_poseBlendShape, d_restShape, d_joints, stream);
+//        std::cout << "regress\n";
+//	    transform(d_poseRotation, d_joints, d_globalTransformations, stream);
+//	    std::cout << "transform\n";
+//
+//        if (d_vertices.size() == 0)
+//            skinning(d_globalTransformations, d_custom_weights, d_restShape, d_result_vertices, stream);
+//        else
+//            skinning(d_globalTransformations, d_custom_weights, d_vertices, d_result_vertices, stream);
 
 	    std::cout << "done\n";
+	d_joints.release();
+	std::cout << "joints reelase\n";
+	d_restPoseRotation.release();
+	std::cout << "restposerot release\n";
+	d_poseRotation.release();
+	std::cout << "poserot release\n";
     }
 
     DeviceArray<float> SMPL::lbs_for_model(
@@ -122,7 +128,7 @@ namespace surfelwarp {
             const DeviceArray<float> &theta,
             cudaStream_t stream
     ) {
-        DeviceArray<float> d_result_vertices(DeviceArray<float>(VERTEX_NUM * 3));
+        DeviceArray<float> d_result_vertices = DeviceArray<float>(VERTEX_NUM * 3);
         run(beta, theta, d_weights, d_result_vertices, stream);
         return d_result_vertices;
     }
