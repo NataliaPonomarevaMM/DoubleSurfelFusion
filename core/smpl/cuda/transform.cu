@@ -13,6 +13,8 @@ namespace surfelwarp {
                 PtrSz<float>localTransformations
         ) {
             int i = threadIdx.x;
+            if (i * 16 + 16 >= localTransformations.size)
+                return;
             //copy data from poseRotation
             for (int k = 0; k < 3; k++)
                 for (int l = 0; l < 3; l++)
@@ -55,6 +57,8 @@ namespace surfelwarp {
                 PtrSz<float> globalTransformations
         ) {
             int j = threadIdx.x;
+            if (j * 16 + 16 >= localTransformations.size)
+                return;
 
             float elim[3];
             for (int k = 0; k < 3; k++) {

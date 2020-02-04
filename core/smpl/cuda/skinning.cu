@@ -16,6 +16,9 @@ namespace surfelwarp {
         ) {
             int j = threadIdx.x;
 
+            if (j * 3 + 3 >= vertices.size)
+                return;
+
             float coeffs[16] = {0};
             for (int k = 0; k < 4; k++)
                 for (int l = 0; l < 4; l++)

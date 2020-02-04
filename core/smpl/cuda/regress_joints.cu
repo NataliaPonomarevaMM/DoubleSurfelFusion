@@ -12,10 +12,9 @@ namespace surfelwarp {
                 const PtrSz<const float> poseBlendShape,
                 PtrSz<float> restShape
         ) {
-            int j = blockIdx.x;
-            int k = threadIdx.x;
-
-            int ind = j * 3 + k;
+            const auto ind = threadIdx.x + blockDim.x * blockIdx.x;
+            if (ind >= restShape.size)
+                return;
             restShape[ind] = templateRestShape[ind] + shapeBlendShape[ind] + poseBlendShape[ind];
         }
 
@@ -26,10 +25,11 @@ namespace surfelwarp {
                 const int vertexnum,
                 PtrSz<float> joints
         ) {
-            int j = blockIdx.x;
-            int l = threadIdx.x;
+            const auto ind = threadIdx.x + blockDim.x * blockIdx.x;
+            if (ind >= restShape.size)
+                return;
 
-            int ind = j * 3 + l;
+            int l = threadIdx.x;
             joints[ind] = 0;
             for (int k = 0; k < vertexnum; k++)
                 joints[ind] += (templateRestShape[k * 3 + l] +
