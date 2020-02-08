@@ -62,9 +62,10 @@ namespace surfelwarp {
         ~SMPL();
         SURFELWARP_NO_COPY_ASSIGN_MOVE(SMPL);
         // Run the model with a specific group of beta, theta.
-        DeviceArray<float> lbs_for_model(
+        void lbs_for_model(
                 const DeviceArray<float> &beta,
                 const DeviceArray<float> &theta,
+		DeviceArray<float> &result_vertices,
                 cudaStream_t stream = 0);
         DeviceArray<float> lbs_for_custom_vertices(
             const DeviceArray<float> &beta,

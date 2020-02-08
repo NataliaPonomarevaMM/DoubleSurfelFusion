@@ -57,7 +57,7 @@ namespace surfelwarp {
                 PtrSz<float> globalTransformations
         ) {
             int j = threadIdx.x;
-            if (j * 16 + 16 >= localTransformations.size)
+            if (j * 16 + 16 >= globalTransformations.size)
                 return;
 
             float elim[3];

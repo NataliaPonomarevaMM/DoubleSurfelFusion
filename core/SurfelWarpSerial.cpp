@@ -30,11 +30,13 @@ surfelwarp::SurfelWarpSerial::SurfelWarpSerial() {
 	file >> tb_data;
     std::cout << "HMR results loaded\n";
 	float* data_arr = tb_data["arr"].get<std::vector<std::vector<float>>>()[0].data();
-	m_theta = DeviceArray<float>(data_arr+3, 72);
-	m_beta = DeviceArray<float>(data_arr+75, 10);
+	m_theta.upload(data_arr+3, 72);
+	m_beta.upload(data_arr+75, 10);
 
     //TEST
-    m_smpl_model->lbs_for_model(m_beta, m_theta);
+	DeviceArray<float> d_result_vertices = DeviceArray<float>(VERTEX_NUM * 3);
+    m_smpl_model->lbs_for_model(m_beta, m_theta, d_result_vertices);
+	d_result_vertices.release();
 	
 	//Construct the image processor
 	FetchInterface::Ptr fetcher = std::make_shared<GenericFileFetch>(config.data_path());

@@ -26,10 +26,11 @@ namespace surfelwarp {
                 PtrSz<float> joints
         ) {
             const auto ind = threadIdx.x + blockDim.x * blockIdx.x;
-            if (ind >= restShape.size)
+            if (ind >= joints.size)
                 return;
 
-            int l = threadIdx.x;
+		 int j = blockIdx.x;
+             int l = threadIdx.x;
             joints[ind] = 0;
             for (int k = 0; k < vertexnum; k++)
                 joints[ind] += (templateRestShape[k * 3 + l] +

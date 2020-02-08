@@ -17,12 +17,12 @@ namespace surfelwarp {
         auto kinematicTree = model["kinematic_tree"].get<std::vector<int64_t>>();
         auto weights = model["weights"].get<std::vector<float>>();
 
-        d_poseBlendBasis = DeviceArray<float>(poseBlendBasis.data(), VERTEX_NUM * 3 * POSE_BASIS_DIM);
-        d_shapeBlendBasis = DeviceArray<float>(shapeBlendBasis.data(), VERTEX_NUM * 3 * SHAPE_BASIS_DIM);
-        d_templateRestShape = DeviceArray<float>(templateRestShape.data(), VERTEX_NUM * 3);
-        d_jointRegressor = DeviceArray<float>(jointRegressor.data(), JOINT_NUM * VERTEX_NUM);
-        d_weights = DeviceArray<float>(weights.data(), VERTEX_NUM * JOINT_NUM);
-        d_kinematicTree = DeviceArray<int64_t>(kinematicTree.data(), 2 * JOINT_NUM);
+        d_poseBlendBasis.upload(poseBlendBasis.data(), VERTEX_NUM * 3 * POSE_BASIS_DIM);
+        d_shapeBlendBasis.upload(shapeBlendBasis.data(), VERTEX_NUM * 3 * SHAPE_BASIS_DIM);
+        d_templateRestShape.upload(templateRestShape.data(), VERTEX_NUM * 3);
+        d_jointRegressor.upload(jointRegressor.data(), JOINT_NUM * VERTEX_NUM);
+        d_weights.upload(weights.data(), VERTEX_NUM * JOINT_NUM);
+        d_kinematicTree.upload(kinematicTree.data(), 2 * JOINT_NUM);
     }
 
     void moveModel(std::string &modelPath) {
@@ -110,16 +110,32 @@ namespace surfelwarp {
         else
             skinning(d_globalTransformations, d_custom_weights, d_vertices, d_result_vertices, stream);
 
+		cudaSafeCall(cudaDeviceSynchronize());
+	cudaSafeCall(cudaGetLastError());
 	    std::cout << "done\n";
     }
 
-    DeviceArray<float> SMPL::lbs_for_model(
+    void SMPL::lbs_for_model(
             const DeviceArray<float> &beta,
             const DeviceArray<float> &theta,
+            DeviceArray<float> &result_vertices,
             cudaStream_t stream
     ) {
-        DeviceArray<float> d_result_vertices = DeviceArray<float>(VERTEX_NUM * 3);
-        run(beta, theta, d_weights, d_result_vertices, stream);
-        return d_result_vertices;
+	DeviceArray<float> d_poseRotation = DeviceArray<float>(JOINT_NUM * 9);
+        DeviceArray<float> d_restPoseRotation = DeviceArray<float>(JOINT_NUM * 9);
+        DeviceArray<float> d_poseBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
+        DeviceArray<float> d_shapeBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
+        DeviceArray<float> d_restShape = DeviceArray<float>(VERTEX_NUM * 3);
+        DeviceArray<float> d_joints = DeviceArray<float>(JOINT_NUM * 3);
+        DeviceArray<float> d_globalTransformations = DeviceArray<float>(JOINT_NUM * 16);
+
+        poseBlendShape(theta, d_poseRotation, d_restPoseRotation, d_poseBlendShape, stream);
+        shapeBlendShape(beta, d_shapeBlendShape, stream);
+        regressJoints(d_shapeBlendShape, d_poseBlendShape, d_restShape, d_joints, stream);
+        transform(d_poseRotation, d_joints, d_globalTransformations, stream);
+        skinning(beta,beta,beta,d_poseRotation, stream);
+        std::cout << "done\n";
+                cudaSafeCall(cudaDeviceSynchronize());
+        cudaSafeCall(cudaGetLastError());
     }
 } // namespace smpl

@@ -10,7 +10,6 @@ namespace surfelwarp {
                 const PtrSz<const float> restShape,
                 const PtrSz<const float> transformation,
                 const PtrSz<const float> weights,
-                const int vertexnum,
                 const int jointnum,
                 PtrSz<float> vertices
         ) {
@@ -45,6 +44,6 @@ namespace surfelwarp {
             cudaStream_t stream
     ) {
         device::Skinning<<<1,VERTEX_NUM,0,stream>>>(d_vertices, d_transformation, d_custom_weights,
-                d_vertices.size(), JOINT_NUM, d_result_vertices);
+               JOINT_NUM, d_result_vertices);
     }
 }
