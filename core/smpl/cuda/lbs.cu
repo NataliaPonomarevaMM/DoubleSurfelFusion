@@ -2,6 +2,7 @@
 #include "core/smpl/def.h"
 #include "core/smpl/smpl.h"
 #include "common/common_types.h"
+#include "common/Constants.h"
 
 namespace surfelwarp {
     namespace device {
@@ -59,7 +60,7 @@ namespace surfelwarp {
                 const PtrSz<const int> ind,
                 const int jointnum,
                 const int vertexnum,
-                PtrSz<float>new_weights
+                PtrSz<float> new_weights
         ) {
             int j = threadIdx.x; // num of weight
             int i = blockIdx.x; // num of vertex
@@ -72,6 +73,45 @@ namespace surfelwarp {
                         weights[ind[i * 4 + k] * jointnum + j];
             }
             new_weights[i * jointnum + j] /= weight;
+        }
+
+
+        __global__ void mark_body_nodes(
+                const DeviceArrayView<float4> reference_vertex,
+                const PtrSz<const float> templateRestShape,
+                const PtrSz<const float> shapeBlendShape,
+                const int vertex_num,
+                const int max_dist,
+                PtrSz<bool> on_body
+        ) {
+            int i = blockIdx.x; // reference vertex size
+            int j = threadIdx.x; // smpl size
+            if (3 * (j + 1) >= shapeBlendShape.size || i >= reference_vertex.Size())
+                return;
+
+            float dist = 0;
+            const float cur[3] = {reference_vertex[i].x, reference_vertex[i].y, reference_vertex[i].z};
+            for (int k = 0; k < 3; k++) {
+                float restShape = templateRestShape[j * 3 + k] + shapeBlendShape[j * 3 + k];
+                dist += (cur[k] - restShape) * (cur[k] - restShape);
+            }
+            if (dist <= max_dist)
+                onbody[i] = true;
+        }
+
+        __global__ void copy_body_nodes(
+                const DeviceArrayView<float4> reference_vertex,
+                const PtrSz<const bool> on_body,
+                PtrSz<float> onbody_points,
+                PtrSz<float> farbody_points
+        ) {
+            int on = 0, far = 0;
+            for (int i = 0; i < reference_vertex.Size(); i++) {
+                if (on_body[i])
+                    onbody_points[on++] = reference_vertex[i];
+                else
+                    farbody_points[far++] = reference_vertex[i];
+            }
         }
     }
 
@@ -95,11 +135,41 @@ namespace surfelwarp {
         device::CalculateWeights<<<d_vertices.size(),JOINT_NUM>>>(d_dist, d_weights, d_ind,  JOINT_NUM, VERTEX_NUM, d_cur_weights);
         run(beta, theta, d_cur_weights, d_result_vertices, stream, d_vertices);
 
-        d_shapeBlendShape.release();
-        d_dist.release();
-        d_ind.release();
-        d_cur_weights.release();
-
         return d_result_vertices;
+    }
+
+    void SMPL::SplitOnBodyVertices(
+            const DeviceArrayView<float4>& reference_vertex,
+            const DeviceArray<float> &beta,
+            DeviceArray<float4>& onbody_points,
+            DeviceArray<float4>& farbody_points
+    ) {
+        DeviceArray<float> d_shapeBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
+        DeviceArray<bool> marked_vertices = DeviceArray<float>(reference_vertex.Size());
+
+        shapeBlendShape(beta, d_shapeBlendShape, stream);
+
+        device::mark_body_nodes<<<reference_vertex.Size(),VERTEX_NUM>>>(
+                reference_vertex, d_templateRestShape,
+                d_shapeBlendShape, VERTEX_NUM, 2.8f * Constants::kNodeRadius, marked_vertices);
+
+        auto host_array = std::vector<bool>(marked_vertices.ArraySize());
+        cudaSafeCall(cudaMemcpyAsync(
+                host_array.data(),
+                marked_vertices.Ptr(),
+                sizeof(bool) * host_array.size(),
+                cudaMemcpyDeviceToHost, stream
+        ));
+        cudaSafeCall(cudaStreamSynchronize(stream));
+
+        int num = 0;
+        for (int i = 0; i < host_array.size(); i++)
+            if (host_array[i])
+                num++;
+
+        onbody_points = DeviceArray<float>(num);
+        farbody_points = DeviceArray<float>(reference_vertex.Size() - num);
+
+        device::copy_body_nodes<<<1,1>>>(reference_vertex, marked_vertices, onbody_points, farbody_points);
     }
 }

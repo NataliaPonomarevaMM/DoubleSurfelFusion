@@ -72,6 +72,12 @@ namespace surfelwarp {
             const DeviceArray<float> &theta,
             const DeviceArray<float> &d_vertices,
             cudaStream_t stream = 0);
+        void SplitOnBodyVertices(
+                const DeviceArrayView<float4>& reference_vertex,
+                const DeviceArray<float> &beta,
+                DeviceArray<float4>& onbody_points,
+                DeviceArray<float4>& farbody_points
+                );
     };
 } // namespace smpl
 #endif // SMPL_H

@@ -100,7 +100,8 @@ void surfelwarp::SurfelWarpSerial::ProcessFirstFrame() {
 	
 	//Build the reference vertex and SE3 for the warp field
 	const auto reference_vertex = m_surfel_geometry[m_updated_geometry_index]->GetReferenceVertexConfidence();
-	m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(reference_vertex, m_warp_field);
+	m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(reference_vertex, m_warp_field,
+                                                                     m_smpl_model, m_beta);
 	
 	//Build the index and skinning nodes and surfels
 	m_warp_field->BuildNodeGraph();

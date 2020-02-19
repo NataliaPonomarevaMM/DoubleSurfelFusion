@@ -28,7 +28,11 @@ namespace surfelwarp {
 		SURFELWARP_NO_COPY_ASSIGN_MOVE(WarpFieldInitializer);
 
 		//The processing interface
-		void InitializeReferenceNodeAndSE3FromVertex(const DeviceArrayView<float4>& reference_vertex, WarpField::Ptr warp_field, cudaStream_t stream = 0);
+		void InitializeReferenceNodeAndSE3FromVertex(
+		        const DeviceArrayView<float4>& reference_vertex,
+		        WarpField::Ptr warp_field,
+                SMPL::Ptr smpl,
+		        cudaStream_t stream = 0);
 
 
 		/* Perform subsampling of the reference vertex, fill the node to node_candidate
@@ -37,7 +41,6 @@ namespace surfelwarp {
 	private:
 		VoxelSubsampler::Ptr m_vertex_subsampler;
 		SynchronizeArray<float4> m_node_candidate;
-		void performVertexSubsamplingSync(const DeviceArrayView<float4>& reference_vertex, cudaStream_t stream = 0);
 	};
 	
 }

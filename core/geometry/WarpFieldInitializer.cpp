@@ -20,25 +20,25 @@ surfelwarp::WarpFieldInitializer::~WarpFieldInitializer() {
 
 void surfelwarp::WarpFieldInitializer::InitializeReferenceNodeAndSE3FromVertex(
 	const DeviceArrayView<float4>& reference_vertex,
-	WarpField::Ptr warp_field,
+	WarpField::Ptr warp_field, SMPL::Ptr smpl,
+    const DeviceArray<float> &beta,
 	cudaStream_t stream
 ) {
 	//First subsampling
-	performVertexSubsamplingSync(reference_vertex, stream);
-	
-	//Next select from candidate
-	const auto& h_candidates = m_node_candidate.HostArray();
-	WarpFieldUpdater::InitializeReferenceNodesAndSE3FromCandidates(*warp_field, h_candidates, stream);
-}
+    DeviceArray<float4> onbody, farbody;
+	smpl->SplitOnBodyVertices(reference_vertex, beta, onbody, farbody);
+	auto onbody_read = DeviceArrayView<float4>(onbody);
+    auto farbody_read  = DeviceArrayView<float4>(farbody);
 
-void surfelwarp::WarpFieldInitializer::performVertexSubsamplingSync(
-	const DeviceArrayView<float4>& reference_vertex,
-	cudaStream_t stream
-) {
-	//The voxel size
-	const auto subsample_voxel = 0.7f * Constants::kNodeRadius;
-	
-	//Perform subsampling
-	auto& node_candidates = m_node_candidate;
-	m_vertex_subsampler->PerformSubsample(reference_vertex, node_candidates, subsample_voxel, stream);
+    SynchronizeArray<float4> onbody_node_candidates;
+    m_vertex_subsampler->PerformSubsample(onbody_read, onbody_node_candidates,
+            0.7f * Constants::kNodeRadius, stream);
+    SynchronizeArray<float4> farbody_node_candidates;
+    m_vertex_subsampler->PerformSubsample(farbody_read, farbody_node_candidates,
+            2f * Constants::kNodeRadius, stream);
+    auto h_onbody = onbody_node_candidates.HostArray();
+    auto h_farbody = farbody_node_candidates.HostArray();
+    std::copy(h_farbody.begin(), h_farbody.end(), std::back_inserter(h_onbody));
+
+	WarpFieldUpdater::InitializeReferenceNodesAndSE3FromCandidates(*warp_field, h_onbody, stream);
 }
