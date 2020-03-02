@@ -91,19 +91,17 @@ namespace surfelwarp {
     }
 
     void SMPL::poseBlendShape(
-            const DeviceArray<float> &theta,
-            DeviceArray<float> &d_poseRotation,
-            DeviceArray<float> &d_restPoseRotation,
-            DeviceArray<float> &d_poseBlendShape,
+            DeviceArray<float> &poseRotation,
+            DeviceArray<float> &restPoseRotation,
+            DeviceArray<float> &poseBlendShape,
             cudaStream_t stream) {
-        device::PoseBlend1<<<1,JOINT_NUM,0,stream>>>(theta, d_poseRotation, d_restPoseRotation);        
-	device::PoseBlend2<<<VERTEX_NUM,3,0,stream>>>(d_poseRotation, d_poseBlendBasis, d_restPoseRotation, d_poseBlendShape);
+        device::PoseBlend1<<<1,JOINT_NUM,0,stream>>>(m__theta, poseRotation, restPoseRotation);
+	    device::PoseBlend2<<<VERTEX_NUM,3,0,stream>>>(poseRotation, m__poseBlendBasis, restPoseRotation, poseBlendShape);
     }
 
     void SMPL::shapeBlendShape(
-            const DeviceArray<float> &beta,
             DeviceArray<float> &d_shapeBlendShape,
             cudaStream_t stream) {
-        device::ShapeBlend<<<VERTEX_NUM,3,0,stream>>>(beta, d_shapeBlendBasis, SHAPE_BASIS_DIM, d_shapeBlendShape);
+        device::ShapeBlend<<<VERTEX_NUM,3,0,stream>>>(m__beta, m__shapeBlendBasis, SHAPE_BASIS_DIM, shapeBlendShape);
     }
 }

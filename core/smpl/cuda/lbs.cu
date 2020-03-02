@@ -81,7 +81,6 @@ namespace surfelwarp {
                 const DeviceArrayView<float4> reference_vertex,
                 const PtrSz<const float> templateRestShape,
                 const PtrSz<const float> shapeBlendShape,
-                const int vertex_num,
                 const int max_dist,
                 PtrSz<bool> on_body
         ) {
@@ -116,50 +115,59 @@ namespace surfelwarp {
         }
     }
 
-    DeviceArray<float> SMPL::lbs_for_custom_vertices(
-            const DeviceArray<float> &beta,
-            const DeviceArray<float> &theta,
-            const DeviceArray<float> &d_vertices,
+    void SMPL::lbs_for_custom_vertices(
+            const DeviceArray<float> &vertices,
+            DeviceArray<float> &result_vertices,
             cudaStream_t stream
     ) {
-        DeviceArray<float> d_shapeBlendShape(DeviceArray<float>(VERTEX_NUM * 3));
-        DeviceArray<float> d_dist(DeviceArray<float>(d_vertices.size() * VERTEX_NUM));
-        DeviceArray<int> d_ind(DeviceArray<int>(d_vertices.size() * 4));
-        DeviceArray<float> d_cur_weights(DeviceArray<float>(d_vertices.size() * JOINT_NUM));
-        DeviceArray<float> d_result_vertices(DeviceArray<float>(d_vertices.size() * 3));
+        auto poseRotation = DeviceArray<float>(JOINT_NUM * 9);
+        auto restPoseRotation = DeviceArray<float>(JOINT_NUM * 9);
+        auto poseBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
+        auto shapeBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
+        auto restShape = DeviceArray<float>(VERTEX_NUM * 3);
+        auto joints = DeviceArray<float>(JOINT_NUM * 3);
+        auto globalTransformations = DeviceArray<float>(JOINT_NUM * 16);
 
-        shapeBlendShape(beta, d_shapeBlendShape, stream);
+        poseBlendShape(poseRotation, restPoseRotation, poseBlendShape, stream);
+        shapeBlendShape(shapeBlendShape, stream);
+        regressJoints(shapeBlendShape, poseBlendShape, restShape, joints, stream);
+        transform(poseRotation, joints, globalTransformations, stream);
+
+        auto dist = DeviceArray<float>(vertices.size() * VERTEX_NUM));
+        auto ind = DeviceArray<int>(vertices.size() * 4));
+        auto cur_weights = DeviceArray<float>(vertices.size() * JOINT_NUM));
+
         // find k nearest neigbours
-        device::FindKNN1<<<d_vertices.size(),VERTEX_NUM>>>(d_templateRestShape, d_shapeBlendShape, VERTEX_NUM, d_vertices, d_dist);
-        device::FindKNN2<<<1,d_vertices.size()>>>(d_dist, VERTEX_NUM, d_ind);
+        device::FindKNN1<<<vertices.size(),VERTEX_NUM>>>(m__templateRestShape, shapeBlendShape, VERTEX_NUM, vertices, dist);
+        device::FindKNN2<<<1,vertices.size()>>>(dist, VERTEX_NUM, ind);
         // calculate weights
-        device::CalculateWeights<<<d_vertices.size(),JOINT_NUM>>>(d_dist, d_weights, d_ind,  JOINT_NUM, VERTEX_NUM, d_cur_weights);
-        run(beta, theta, d_cur_weights, d_result_vertices, stream, d_vertices);
+        device::CalculateWeights<<<vertices.size(),JOINT_NUM>>>(dist, m__weights, ind,  JOINT_NUM, VERTEX_NUM, cur_weights);
 
-        return d_result_vertices;
+        skinning(d_globalTransformations, cur_weights, vertices, result_vertices, stream);
+
+        cudaSafeCall(cudaDeviceSynchronize());
+        cudaSafeCall(cudaGetLastError());
+        std::cout << "done\n";
     }
 
     void SMPL::SplitOnBodyVertices(
             const DeviceArrayView<float4>& reference_vertex,
-            const DeviceArray<float> &beta,
             DeviceArray<float4>& onbody_points,
-           DeviceArray<float4>& farbody_points,
-       	cudaStream_t stream
+            DeviceArray<float4>& farbody_points,
+       	    cudaStream_t stream
     ) {
-	std::cout << "start split\n";
-
-        DeviceArray<float> d_shapeBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
+	    std::cout << "start split\n";
+        DeviceArray<float> shapeBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
         DeviceArray<bool> marked_vertices = DeviceArray<bool>(reference_vertex.Size());
 
-        shapeBlendShape(beta, d_shapeBlendShape, stream);
+        shapeBlendShape(shapeBlendShape, stream);
 
         device::mark_body_nodes<<<reference_vertex.Size(),VERTEX_NUM>>>(
-                reference_vertex, d_templateRestShape,
-                d_shapeBlendShape, VERTEX_NUM, 2.8f * Constants::kNodeRadius, marked_vertices);
+                reference_vertex, m__templateRestShape,
+                shapeBlendShape, 2.8f * Constants::kNodeRadius, marked_vertices);
 
         bool *host_array = (bool *)malloc(sizeof(bool) * marked_vertices.size());
-
-	marked_vertices.download(host_array);
+	    marked_vertices.download(host_array);
         int num = 0;
         for (int i = 0; i < marked_vertices.size(); i++)
             if (host_array[i])
@@ -167,9 +175,10 @@ namespace surfelwarp {
 
         onbody_points = DeviceArray<float4>(num);
         farbody_points = DeviceArray<float4>(reference_vertex.Size() - num);
-
         device::copy_body_nodes<<<1,1>>>(reference_vertex, marked_vertices, onbody_points, farbody_points);
-cudaSafeCall(cudaStreamSynchronize(stream));
-	std::cout << "end split\n";
+
+        cudaSafeCall(cudaStreamSynchronize(stream));
+        cudaSafeCall(cudaGetLastError());
+	    std::cout << "end split\n";
     }
 }

@@ -39,15 +39,15 @@ namespace surfelwarp {
     }
 
     void SMPL::regressJoints(
-            const DeviceArray<float> &d_shapeBlendShape,
-            const DeviceArray<float> &d_poseBlendShape,
-            DeviceArray<float> &d_restShape,
-            DeviceArray<float> &d_joints,
+            const DeviceArray<float> &shapeBlendShape,
+            const DeviceArray<float> &poseBlendShape,
+            DeviceArray<float> &restShape,
+            DeviceArray<float> &joints,
             cudaStream_t stream
     ) {
-        device::RegressJoints1<<<VERTEX_NUM,3,0,stream>>>(d_templateRestShape,
-                d_shapeBlendShape, d_poseBlendShape, d_restShape);
-        device::RegressJoints2<<<JOINT_NUM,3,0,stream>>>(d_templateRestShape,
-                d_shapeBlendShape, d_jointRegressor, VERTEX_NUM, d_joints);
+        device::RegressJoints1<<<VERTEX_NUM,3,0,stream>>>(m__templateRestShape,
+                shapeBlendShape, poseBlendShape, restShape);
+        device::RegressJoints2<<<JOINT_NUM,3,0,stream>>>(m__templateRestShape,
+                shapeBlendShape, m__jointRegressor, VERTEX_NUM, joints);
     }
 }

@@ -21,25 +21,15 @@ surfelwarp::SurfelWarpSerial::SurfelWarpSerial() {
 	const auto& config = ConfigParser::Instance();
 
 	//The SMPL model
-    std::string model_path = "/home/nponomareva/DoubleFusion/data/smpl_female2.json";
-    std::string hmr_path = "/home/nponomareva/data/hmr_results/hmr_data.json";
     m_smpl_model = std::make_shared<SMPL>(model_path);
     std::cout << "Model loaded\n";
-	nlohmann::json tb_data; // JSON object represents.
-	std::ifstream file(hmr_path);
-	file >> tb_data;
-    std::cout << "HMR results loaded\n";
-	float* data_arr = tb_data["arr"].get<std::vector<std::vector<float>>>()[0].data();
-	m_theta.upload(data_arr+3, 72);
-	m_beta.upload(data_arr+75, 10);
 
     //TEST
-	DeviceArray<float> d_result_vertices = DeviceArray<float>(VERTEX_NUM * 3);
-    m_smpl_model->lbs_for_model(m_beta, m_theta, d_result_vertices);
+	auto result_vertices = DeviceArray<float>(VERTEX_NUM * 3);
+    m_smpl_model->LbsModel(result_vertices);
 	d_result_vertices.release();
 	std::cout << "end smpl\n";
 
-	
 	//Construct the image processor
 	FetchInterface::Ptr fetcher = std::make_shared<GenericFileFetch>(config.data_path());
 	m_image_processor = std::make_shared<ImageProcessor>(fetcher);
@@ -102,8 +92,7 @@ void surfelwarp::SurfelWarpSerial::ProcessFirstFrame() {
 	
 	//Build the reference vertex and SE3 for the warp field
 	const auto reference_vertex = m_surfel_geometry[m_updated_geometry_index]->GetReferenceVertexConfidence();
-	m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(reference_vertex, m_warp_field,
-                                                                     m_smpl_model, m_beta);
+	m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(reference_vertex, m_warp_field, m_smpl_model);
 	
 	//Build the index and skinning nodes and surfels
 	m_warp_field->BuildNodeGraph();
@@ -225,7 +214,7 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 		
 		//Reinit the warp field
 		const auto reference_vertex = m_surfel_geometry[fused_geometry_idx]->GetReferenceVertexConfidence();
-		m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(reference_vertex, m_warp_field, m_smpl_model, m_beta);
+		m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(reference_vertex, m_warp_field, m_smpl_model);
 		
 		//Build the index and skinning nodes and surfels
 		m_warp_field->BuildNodeGraph();

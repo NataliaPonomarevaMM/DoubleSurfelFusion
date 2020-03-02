@@ -32,7 +32,7 @@ namespace surfelwarp {
 		void InitializeReferenceNodeAndSE3FromVertex(
 		        const DeviceArrayView<float4>& reference_vertex,
 		        WarpField::Ptr warp_field,
-                SMPL::Ptr smpl, const DeviceArray<float> &beta,
+                SMPL::Ptr smpl,
 		        cudaStream_t stream = 0);
 
 
