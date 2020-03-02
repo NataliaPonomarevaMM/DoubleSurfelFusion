@@ -1,3 +1,4 @@
+#include <vector>
 #include <cmath>
 #include "core/smpl/def.h"
 #include "core/smpl/smpl.h"
@@ -96,14 +97,14 @@ namespace surfelwarp {
                 dist += (cur[k] - restShape) * (cur[k] - restShape);
             }
             if (dist <= max_dist)
-                onbody[i] = true;
+                on_body[i] = true;
         }
 
         __global__ void copy_body_nodes(
                 const DeviceArrayView<float4> reference_vertex,
                 const PtrSz<const bool> on_body,
-                PtrSz<float> onbody_points,
-                PtrSz<float> farbody_points
+                PtrSz<float4> onbody_points,
+                PtrSz<float4> farbody_points
         ) {
             int on = 0, far = 0;
             for (int i = 0; i < reference_vertex.Size(); i++) {
@@ -142,10 +143,13 @@ namespace surfelwarp {
             const DeviceArrayView<float4>& reference_vertex,
             const DeviceArray<float> &beta,
             DeviceArray<float4>& onbody_points,
-            DeviceArray<float4>& farbody_points
+           DeviceArray<float4>& farbody_points,
+       	cudaStream_t stream
     ) {
+	std::cout << "start split\n";
+
         DeviceArray<float> d_shapeBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
-        DeviceArray<bool> marked_vertices = DeviceArray<float>(reference_vertex.Size());
+        DeviceArray<bool> marked_vertices = DeviceArray<bool>(reference_vertex.Size());
 
         shapeBlendShape(beta, d_shapeBlendShape, stream);
 
@@ -153,23 +157,19 @@ namespace surfelwarp {
                 reference_vertex, d_templateRestShape,
                 d_shapeBlendShape, VERTEX_NUM, 2.8f * Constants::kNodeRadius, marked_vertices);
 
-        auto host_array = std::vector<bool>(marked_vertices.ArraySize());
-        cudaSafeCall(cudaMemcpyAsync(
-                host_array.data(),
-                marked_vertices.Ptr(),
-                sizeof(bool) * host_array.size(),
-                cudaMemcpyDeviceToHost, stream
-        ));
-        cudaSafeCall(cudaStreamSynchronize(stream));
+        bool *host_array = (bool *)malloc(sizeof(bool) * marked_vertices.size());
 
+	marked_vertices.download(host_array);
         int num = 0;
-        for (int i = 0; i < host_array.size(); i++)
+        for (int i = 0; i < marked_vertices.size(); i++)
             if (host_array[i])
                 num++;
 
-        onbody_points = DeviceArray<float>(num);
-        farbody_points = DeviceArray<float>(reference_vertex.Size() - num);
+        onbody_points = DeviceArray<float4>(num);
+        farbody_points = DeviceArray<float4>(reference_vertex.Size() - num);
 
         device::copy_body_nodes<<<1,1>>>(reference_vertex, marked_vertices, onbody_points, farbody_points);
+cudaSafeCall(cudaStreamSynchronize(stream));
+	std::cout << "end split\n";
     }
 }

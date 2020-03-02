@@ -25,20 +25,28 @@ void surfelwarp::WarpFieldInitializer::InitializeReferenceNodeAndSE3FromVertex(
 	cudaStream_t stream
 ) {
 	//First subsampling
+	std::cout << "start subsampling\n";
     DeviceArray<float4> onbody, farbody;
-	smpl->SplitOnBodyVertices(reference_vertex, beta, onbody, farbody);
+	smpl->SplitOnBodyVertices(reference_vertex, beta, onbody, farbody, stream);
 	auto onbody_read = DeviceArrayView<float4>(onbody);
     auto farbody_read  = DeviceArrayView<float4>(farbody);
+
+cudaSafeCall(cudaStreamSynchronize(stream));
 
     SynchronizeArray<float4> onbody_node_candidates;
     m_vertex_subsampler->PerformSubsample(onbody_read, onbody_node_candidates,
             0.7f * Constants::kNodeRadius, stream);
+cudaSafeCall(cudaStreamSynchronize(stream));
+	std::cout << "perform subsample 1\n";
     SynchronizeArray<float4> farbody_node_candidates;
     m_vertex_subsampler->PerformSubsample(farbody_read, farbody_node_candidates,
-            2f * Constants::kNodeRadius, stream);
+            2.0f * Constants::kNodeRadius, stream);
+	std::cout << "perform subsample 2\n";
     auto h_onbody = onbody_node_candidates.HostArray();
     auto h_farbody = farbody_node_candidates.HostArray();
     std::copy(h_farbody.begin(), h_farbody.end(), std::back_inserter(h_onbody));
 
 	WarpFieldUpdater::InitializeReferenceNodesAndSE3FromCandidates(*warp_field, h_onbody, stream);
+
+	std::cout << "end subsample\n";
 }

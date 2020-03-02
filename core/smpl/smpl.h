@@ -76,8 +76,8 @@ namespace surfelwarp {
                 const DeviceArrayView<float4>& reference_vertex,
                 const DeviceArray<float> &beta,
                 DeviceArray<float4>& onbody_points,
-                DeviceArray<float4>& farbody_points
-                );
+                DeviceArray<float4>& farbody_points,
+	cudaStream_t stream);
     };
 } // namespace smpl
 #endif // SMPL_H

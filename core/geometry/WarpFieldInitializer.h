@@ -8,6 +8,7 @@
 #include "common/ArrayView.h"
 #include "common/SynchronizeArray.h"
 #include "core/geometry/VoxelSubsampler.h"
+#include "core/smpl/smpl.h"
 #include "core/WarpField.h"
 #include <memory>
 
@@ -31,7 +32,7 @@ namespace surfelwarp {
 		void InitializeReferenceNodeAndSE3FromVertex(
 		        const DeviceArrayView<float4>& reference_vertex,
 		        WarpField::Ptr warp_field,
-                SMPL::Ptr smpl,
+                SMPL::Ptr smpl, const DeviceArray<float> &beta,
 		        cudaStream_t stream = 0);
 
 

@@ -9,25 +9,24 @@ namespace surfelwarp {
         nlohmann::json model; // JSON object represents.
         std::ifstream file(modelPath);
         file >> model;
-
         auto shapeBlendBasis = model["shape_blend_shapes"].get<std::vector<float>>();
         auto poseBlendBasis = model["pose_blend_shapes"].get<std::vector<float>>();
         auto templateRestShape = model["vertices_template"].get<std::vector<float>>();
         auto jointRegressor = model["joint_regressor"].get<std::vector<float>>();
         auto kinematicTree = model["kinematic_tree"].get<std::vector<int64_t>>();
-        auto weights = model["weights"].get<std::vector<float>>();
+        auto modelweights = model["weights"].get<std::vector<float>>();
 
         d_poseBlendBasis.upload(poseBlendBasis.data(), VERTEX_NUM * 3 * POSE_BASIS_DIM);
         d_shapeBlendBasis.upload(shapeBlendBasis.data(), VERTEX_NUM * 3 * SHAPE_BASIS_DIM);
         d_templateRestShape.upload(templateRestShape.data(), VERTEX_NUM * 3);
         d_jointRegressor.upload(jointRegressor.data(), JOINT_NUM * VERTEX_NUM);
-        d_weights.upload(weights.data(), VERTEX_NUM * JOINT_NUM);
         d_kinematicTree.upload(kinematicTree.data(), 2 * JOINT_NUM);
+        d_weights.upload(modelweights.data(), VERTEX_NUM * JOINT_NUM);
     }
 
-    void moveModel(std::string &modelPath) {
+    void moveModel() {
         nlohmann::json model; // JSON object represents.
-        std::ifstream file(modelPath);
+        std::ifstream file("/home/nponomareva/DoubleFusion/data/smpl_female.json");
         file >> model;
 
         auto shapeBlendBasis = model["shape_blend_shapes"].get<std::vector<std::vector<std::vector<float>>>>();
@@ -42,7 +41,7 @@ namespace surfelwarp {
         std::vector<float> templ = std::vector<float>(VERTEX_NUM * 3);
         std::vector<float> joint = std::vector<float>(JOINT_NUM * VERTEX_NUM);
         std::vector<float> wei = std::vector<float>(VERTEX_NUM * JOINT_NUM);
-        std::vector<float> kinematic = std::vector<float>(2 * JOINT_NUM);
+        std::vector<int64_t> kinematic = std::vector<int64_t>(2 * JOINT_NUM);
 
         for (int i = 0; i < VERTEX_NUM; i++)
             for (int j = 0; j < 3; j++)
@@ -133,7 +132,8 @@ namespace surfelwarp {
         shapeBlendShape(beta, d_shapeBlendShape, stream);
         regressJoints(d_shapeBlendShape, d_poseBlendShape, d_restShape, d_joints, stream);
         transform(d_poseRotation, d_joints, d_globalTransformations, stream);
-        skinning(beta,beta,beta,d_poseRotation, stream);
+	//skinning(d_globalTransformations,d_weights,d_poseRotation,result_vertices, stream);
+//        skinning(beta,beta,beta,d_poseRotation, stream);
         std::cout << "done\n";
                 cudaSafeCall(cudaDeviceSynchronize());
         cudaSafeCall(cudaGetLastError());

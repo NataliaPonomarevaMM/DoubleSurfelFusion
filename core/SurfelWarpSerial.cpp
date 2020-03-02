@@ -37,6 +37,8 @@ surfelwarp::SurfelWarpSerial::SurfelWarpSerial() {
 	DeviceArray<float> d_result_vertices = DeviceArray<float>(VERTEX_NUM * 3);
     m_smpl_model->lbs_for_model(m_beta, m_theta, d_result_vertices);
 	d_result_vertices.release();
+	std::cout << "end smpl\n";
+
 	
 	//Construct the image processor
 	FetchInterface::Ptr fetcher = std::make_shared<GenericFileFetch>(config.data_path());
@@ -223,7 +225,7 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 		
 		//Reinit the warp field
 		const auto reference_vertex = m_surfel_geometry[fused_geometry_idx]->GetReferenceVertexConfidence();
-		m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(reference_vertex, m_warp_field);
+		m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(reference_vertex, m_warp_field, m_smpl_model, m_beta);
 		
 		//Build the index and skinning nodes and surfels
 		m_warp_field->BuildNodeGraph();
