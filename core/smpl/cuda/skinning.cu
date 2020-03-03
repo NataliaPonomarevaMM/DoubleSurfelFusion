@@ -13,7 +13,7 @@ namespace surfelwarp {
                 const int jointnum,
                 PtrSz<float> vertices
         ) {
-            int j = threadIdx.x;
+            int j = blockIdx.x;
 
             if (j * 3 + 3 >= vertices.size)
                 return;
@@ -43,7 +43,7 @@ namespace surfelwarp {
             DeviceArray<float> &result_vertices,
             cudaStream_t stream
     ) {
-        device::Skinning<<<1,VERTEX_NUM,0,stream>>>(vertices, transformation, custom_weights,
+        device::Skinning<<<VERTEX_NUM,1,0,stream>>>(vertices, transformation, custom_weights,
                JOINT_NUM, result_vertices);
     }
 }

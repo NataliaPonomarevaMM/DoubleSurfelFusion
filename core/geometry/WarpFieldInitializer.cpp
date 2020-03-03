@@ -30,8 +30,8 @@ void surfelwarp::WarpFieldInitializer::InitializeReferenceNodeAndSE3FromVertex(
 	auto onbody_read = DeviceArrayView<float4>(onbody);
     auto farbody_read  = DeviceArrayView<float4>(farbody);
 
-    cudaSafeCall(cudaDeviceSynchronize(stream));
-    cudaSafeCall(cudaGetLastError(stream));
+    cudaSafeCall(cudaDeviceSynchronize());
+    cudaSafeCall(cudaGetLastError());
 
     SynchronizeArray<float4> onbody_node_candidates;
     m_vertex_subsampler->PerformSubsample(onbody_read, onbody_node_candidates,

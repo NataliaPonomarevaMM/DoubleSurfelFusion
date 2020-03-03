@@ -19,16 +19,16 @@ namespace surfelwarp {
         auto kinematicTree = model["kinematic_tree"].get<std::vector<int64_t>>();
         auto modelweights = model["weights"].get<std::vector<float>>();
 
-        d_poseBlendBasis.upload(poseBlendBasis.data(), VERTEX_NUM * 3 * POSE_BASIS_DIM);
-        d_shapeBlendBasis.upload(shapeBlendBasis.data(), VERTEX_NUM * 3 * SHAPE_BASIS_DIM);
-        d_templateRestShape.upload(templateRestShape.data(), VERTEX_NUM * 3);
-        d_jointRegressor.upload(jointRegressor.data(), JOINT_NUM * VERTEX_NUM);
-        d_kinematicTree.upload(kinematicTree.data(), 2 * JOINT_NUM);
-        d_weights.upload(modelweights.data(), VERTEX_NUM * JOINT_NUM);
+        m__poseBlendBasis.upload(poseBlendBasis.data(), VERTEX_NUM * 3 * POSE_BASIS_DIM);
+        m__shapeBlendBasis.upload(shapeBlendBasis.data(), VERTEX_NUM * 3 * SHAPE_BASIS_DIM);
+        m__templateRestShape.upload(templateRestShape.data(), VERTEX_NUM * 3);
+        m__jointRegressor.upload(jointRegressor.data(), JOINT_NUM * VERTEX_NUM);
+        m__kinematicTree.upload(kinematicTree.data(), 2 * JOINT_NUM);
+        m__weights.upload(modelweights.data(), VERTEX_NUM * JOINT_NUM);
 
         nlohmann::json tb_data; // JSON object represents.
-        std::ifstream file(hmrPath);
-        file >> tb_data;
+        std::ifstream file2(hmrPath);
+        file2 >> tb_data;
         float *data_arr = tb_data["arr"].get<std::vector<std::vector<float>>>()[0].data();
         m__theta.upload(data_arr + 3, 72);
         m__beta.upload(data_arr + 75, 10);
@@ -38,34 +38,33 @@ namespace surfelwarp {
     }
 
     SMPL::~SMPL() {
-        d_poseBlendBasis.release();
-        d_shapeBlendBasis.release();
-        d_templateRestShape.release();
-        d_jointRegressor.release();
-        d_kinematicTree.release();
-        d_weights.release();
+        m__poseBlendBasis.release();
+        m__shapeBlendBasis.release();
+        m__templateRestShape.release();
+        m__jointRegressor.release();
+        m__kinematicTree.release();
+        m__weights.release();
     }
 
-    void SMPL::lbs_for_model(
+    void SMPL::LbsModel(
             DeviceArray<float> &result_vertices,
             cudaStream_t stream
     ) {
 	    auto poseRotation = DeviceArray<float>(JOINT_NUM * 9);
         auto restPoseRotation = DeviceArray<float>(JOINT_NUM * 9);
-        auto poseBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
-        auto shapeBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
+        auto pposeBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
+        auto sshapeBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
         auto restShape = DeviceArray<float>(VERTEX_NUM * 3);
         auto joints = DeviceArray<float>(JOINT_NUM * 3);
         auto globalTransformations = DeviceArray<float>(JOINT_NUM * 16);
 
-        poseBlendShape(poseRotation, restPoseRotation, poseBlendShape, stream);
-        shapeBlendShape(shapeBlendShape, stream);
-        regressJoints(shapeBlendShape, poseBlendShape, restShape, joints, stream);
+        poseBlendShape(poseRotation, restPoseRotation, pposeBlendShape, stream);
+        shapeBlendShape(sshapeBlendShape, stream);
+        regressJoints(sshapeBlendShape, pposeBlendShape, restShape, joints, stream);
         transform(poseRotation, joints, globalTransformations, stream);
-	    skinning(globalTransformations, m__weights, restShape, result_vertices, stream);
+	skinning(globalTransformations, m__weights, restShape, result_vertices, stream);
 
-	    cudaSafeCall(cudaDeviceSynchronize(stream));
-        cudaSafeCall(cudaGetLastError(stream));
-        std::cout << "done\n";
+	cudaSafeCall(cudaDeviceSynchronize());
+	cudaSafeCall(cudaGetLastError());
     }
 } // namespace smpl

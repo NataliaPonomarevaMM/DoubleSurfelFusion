@@ -21,13 +21,13 @@ surfelwarp::SurfelWarpSerial::SurfelWarpSerial() {
 	const auto& config = ConfigParser::Instance();
 
 	//The SMPL model
-    m_smpl_model = std::make_shared<SMPL>(model_path);
+    m_smpl_model = std::make_shared<SMPL>();
     std::cout << "Model loaded\n";
 
     //TEST
 	auto result_vertices = DeviceArray<float>(VERTEX_NUM * 3);
     m_smpl_model->LbsModel(result_vertices);
-	d_result_vertices.release();
+	result_vertices.release();
 	std::cout << "end smpl\n";
 
 	//Construct the image processor
