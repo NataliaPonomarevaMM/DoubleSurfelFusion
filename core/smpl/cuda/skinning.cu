@@ -1,5 +1,5 @@
 #include <cmath>
-#include "core/smpl/def.h"
+#include "core/smpl/def.cuh"
 #include "core/smpl/smpl.h"
 #include "common/common_types.h"
 #include <device_launch_parameters.h>

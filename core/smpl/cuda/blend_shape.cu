@@ -1,5 +1,5 @@
 #include <cmath>
-#include "core/smpl/def.h"
+#include "core/smpl/def.cuh"
 #include "core/smpl/smpl.h"
 #include "common/common_types.h"
 #include <device_launch_parameters.h>
@@ -60,7 +60,6 @@ namespace surfelwarp {
 
         __global__ void PoseBlend2(
                 const PtrSz<const float> poseRotation,
-                const PtrSz<const float> poseBlendBasis,
                 const PtrSz<const float> restPoseRotation,
                 PtrSz<float> poseBlendShape
         ) {
@@ -72,12 +71,11 @@ namespace surfelwarp {
 	    poseBlendShape[ind] = 0;
             for (int l = 0; l < 207; l++)
                 poseBlendShape[ind] += (poseRotation[l + 9] - restPoseRotation[l + 9]) *
-                      poseBlendBasis[ind * 207 + l];
+                      m__poseBlendBasis[ind * 207 + l];
         }
 
         __global__ void ShapeBlend(
                 const PtrSz<const float> beta,
-                const PtrSz<const float> shapeBlendBasis,
                 const int shapebasisdim,
                 PtrSz<float> shapeBlendShape
         ) {
@@ -86,7 +84,7 @@ namespace surfelwarp {
     		return;
             shapeBlendShape[ind] = 0;
             for (int l = 0; l < shapebasisdim; l++)
-                shapeBlendShape[ind] += beta[l] * shapeBlendBasis[ind * shapebasisdim + l];// (6890, 3)
+                shapeBlendShape[ind] += beta[l] * m__shapeBlendBasis[ind * shapebasisdim + l];// (6890, 3)
         }
     }
 
@@ -96,12 +94,12 @@ namespace surfelwarp {
             DeviceArray<float> &poseBlendShape,
             cudaStream_t stream) {
         device::PoseBlend1<<<1,JOINT_NUM,0,stream>>>(m__theta, poseRotation, restPoseRotation);
-	    device::PoseBlend2<<<VERTEX_NUM,3,0,stream>>>(poseRotation, m__poseBlendBasis, restPoseRotation, poseBlendShape);
+	    device::PoseBlend2<<<VERTEX_NUM,3,0,stream>>>(poseRotation, restPoseRotation, poseBlendShape);
     }
 
     void SMPL::shapeBlendShape(
             DeviceArray<float> &sshapeBlendShape,
             cudaStream_t stream) {
-        device::ShapeBlend<<<VERTEX_NUM,3,0,stream>>>(m__beta, m__shapeBlendBasis, SHAPE_BASIS_DIM, sshapeBlendShape);
+        device::ShapeBlend<<<VERTEX_NUM,3,0,stream>>>(m__beta, SHAPE_BASIS_DIM, sshapeBlendShape);
     }
 }
