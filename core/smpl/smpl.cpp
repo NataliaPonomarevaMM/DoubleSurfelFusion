@@ -18,16 +18,16 @@ namespace surfelwarp {
         auto kinematicTree = model["kinematic_tree"].get<std::vector<int64_t>>();
         auto modelweights = model["weights"].get<std::vector<float>>();
 
-        cudaMemcpyToSymbol(m__poseBlendBasis, poseBlendBasis.data(),
-                sizeof(float) * VERTEX_NUM * 3 * POSE_BASIS_DIM);
-        cudaMemcpyToSymbol(m__shapeBlendBasis, shapeBlendBasis.data(),
-                sizeof(float) * VERTEX_NUM * 3 * SHAPE_BASIS_DIM);
-        cudaMemcpyToSymbol(m__templateRestShape, templateRestShape.data(),
-                sizeof(float) * VERTEX_NUM * 3);
-        cudaMemcpyToSymbol(m__jointRegressor, jointRegressor.data(),
-                sizeof(float) * JOINT_NUM * VERTEX_NUM);
-        cudaMemcpyToSymbol(m__kinematicTree, kinematicTree.data(),
-                sizeof(int64_t) * 2 * JOINT_NUM);
+        cudaMemcpy(m__poseBlendBasis, poseBlendBasis.data(),
+                sizeof(float) * VERTEX_NUM * 3 * POSE_BASIS_DIM, cudaMemcpyHostToDevice);
+        cudaMemcpy(m__shapeBlendBasis, shapeBlendBasis.data(),
+                sizeof(float) * VERTEX_NUM * 3 * SHAPE_BASIS_DIM, cudaMemcpyHostToDevice);
+        cudaMemcpy(m__templateRestShape, templateRestShape.data(),
+                sizeof(float) * VERTEX_NUM * 3, cudaMemcpyHostToDevice);
+        cudaMemcpy(m__jointRegressor, jointRegressor.data(),
+                sizeof(float) * JOINT_NUM * VERTEX_NUM, cudaMemcpyHostToDevice);
+        cudaMemcpy(m__kinematicTree, kinematicTree.data(),
+                sizeof(int64_t) * 2 * JOINT_NUM, cudaMemcpyHostToDevice);
 
         m__weights.upload(modelweights.data(), VERTEX_NUM * JOINT_NUM);
 
