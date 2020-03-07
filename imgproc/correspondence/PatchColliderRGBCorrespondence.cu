@@ -65,6 +65,7 @@ namespace surfelwarp { namespace device {
 		cudaTextureObject_t rgb_0, cudaTextureObject_t rgb_1,
 		const typename PatchColliderForest<18, NumTrees>::GPCForestDevice forest,
 		const int stride, const int kv_rows, const int kv_cols,
+		const int keys_size, const int values_size,
 		unsigned* keys, unsigned* values
 	) {
 		const auto kv_x = threadIdx.x + blockDim.x * blockIdx.x;
@@ -90,6 +91,10 @@ namespace surfelwarp { namespace device {
 
 		//Store it
 		const auto offset = 2 * (kv_x + kv_cols * kv_y);
+
+		if (offset + 1 >= keys_size || offset + 1 >= values_size)
+		    return;
+
 		keys[offset + 0] = key_0;
 		keys[offset + 1] = key_1;
 		values[offset + 0] = value_0;
@@ -293,6 +298,8 @@ void surfelwarp::PatchColliderRGBCorrespondence::FindCorrespondence(cudaStream_t
 		forest_dev, 
 		patch_stride, 
 		m_kvmap_rows, m_kvmap_cols,
+		m_treeleaf_key.size(),
+		m_pixel_value.size(),
 		m_treeleaf_key.ptr(),
 		m_pixel_value.ptr()
 	);
