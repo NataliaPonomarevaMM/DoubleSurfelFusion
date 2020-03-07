@@ -1,8 +1,7 @@
 #include <fstream>
-// #include <experimental/filesystem>
 #include <nlohmann/json.hpp>
 #include "core/smpl/smpl.h"
-#include "core/smpl/def.h"
+#include "core/smpl/def.cuh"
 
 namespace surfelwarp {
     SMPL::SMPL() {
@@ -19,11 +18,17 @@ namespace surfelwarp {
         auto kinematicTree = model["kinematic_tree"].get<std::vector<int64_t>>();
         auto modelweights = model["weights"].get<std::vector<float>>();
 
-        m__poseBlendBasis.upload(poseBlendBasis.data(), VERTEX_NUM * 3 * POSE_BASIS_DIM);
-        m__shapeBlendBasis.upload(shapeBlendBasis.data(), VERTEX_NUM * 3 * SHAPE_BASIS_DIM);
-        m__templateRestShape.upload(templateRestShape.data(), VERTEX_NUM * 3);
-        m__jointRegressor.upload(jointRegressor.data(), JOINT_NUM * VERTEX_NUM);
-        m__kinematicTree.upload(kinematicTree.data(), 2 * JOINT_NUM);
+        cudaMemcpy(m__poseBlendBasis, poseBlendBasis.data(),
+                sizeof(float) * VERTEX_NUM * 3 * POSE_BASIS_DIM, cudaMemcpyHostToDevice);
+        cudaMemcpy(m__shapeBlendBasis, shapeBlendBasis.data(),
+                sizeof(float) * VERTEX_NUM * 3 * SHAPE_BASIS_DIM, cudaMemcpyHostToDevice);
+        cudaMemcpy(m__templateRestShape, templateRestShape.data(),
+                sizeof(float) * VERTEX_NUM * 3, cudaMemcpyHostToDevice);
+        cudaMemcpy(m__jointRegressor, jointRegressor.data(),
+                sizeof(float) * JOINT_NUM * VERTEX_NUM, cudaMemcpyHostToDevice);
+        cudaMemcpy(m__kinematicTree, kinematicTree.data(),
+                sizeof(int64_t) * 2 * JOINT_NUM, cudaMemcpyHostToDevice);
+
         m__weights.upload(modelweights.data(), VERTEX_NUM * JOINT_NUM);
 
         nlohmann::json tb_data; // JSON object represents.
@@ -35,15 +40,6 @@ namespace surfelwarp {
 
         cudaSafeCall(cudaDeviceSynchronize());
         cudaSafeCall(cudaGetLastError());
-    }
-
-    SMPL::~SMPL() {
-        m__poseBlendBasis.release();
-        m__shapeBlendBasis.release();
-        m__templateRestShape.release();
-        m__jointRegressor.release();
-        m__kinematicTree.release();
-        m__weights.release();
     }
 
     void SMPL::LbsModel(
@@ -62,9 +58,9 @@ namespace surfelwarp {
         shapeBlendShape(sshapeBlendShape, stream);
         regressJoints(sshapeBlendShape, pposeBlendShape, restShape, joints, stream);
         transform(poseRotation, joints, globalTransformations, stream);
-	skinning(globalTransformations, m__weights, restShape, result_vertices, stream);
+	    skinning(globalTransformations, m__weights, restShape, result_vertices, stream);
 
-	cudaSafeCall(cudaDeviceSynchronize());
-	cudaSafeCall(cudaGetLastError());
+	    cudaSafeCall(cudaDeviceSynchronize());
+	    cudaSafeCall(cudaGetLastError());
     }
 } // namespace smpl
