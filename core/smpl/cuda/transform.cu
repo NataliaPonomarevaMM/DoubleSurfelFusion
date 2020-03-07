@@ -1,5 +1,5 @@
 #include <cmath>
-#include "core/smpl/def.cuh"
+#include "core/smpl/def.h"
 #include "core/smpl/smpl.h"
 #include "common/common_types.h"
 #include <device_launch_parameters.h>
@@ -8,6 +8,7 @@ namespace surfelwarp {
     namespace device {
         __global__ void LocalTransform(
                 const PtrSz<const float> joints,
+                const PtrSz<const int64_t> kinematicTree,
                 const PtrSz<const float>poseRotation,
                 PtrSz<float>localTransformations
         ) {
@@ -21,7 +22,7 @@ namespace surfelwarp {
             for (int l = 0; l < 3; l++)
                 localTransformations[i * 16 + 3 * 4 + l] = 0;
             // data from joints
-            int ancestor = m__kinematicTree[i];
+            int ancestor = kinematicTree[i];
             for (int k = 0; k < 3; k++)
                 localTransformations[i * 16 + k * 4 + 3] = i != 0 ? joints[i * 3 + k] - joints[ancestor * 3 + k] : joints[k];
             localTransformations[i * 16 + 3 * 4 + 3] = 1;
@@ -30,6 +31,7 @@ namespace surfelwarp {
 
         __global__ void GlobalTransform(
                 const PtrSz<const float> localTransformations,
+                const PtrSz<const int64_t>kinematicTree,
                 const int jointnum,
                 PtrSz<float>globalTransformations
         ) {
@@ -38,7 +40,7 @@ namespace surfelwarp {
                     globalTransformations[k * 4 + l] = localTransformations[k * 4 + l];
 
             for (int j = 1; j < jointnum; j++) {
-                int anc = m__kinematicTree[j];
+                int anc = kinematicTree[j];
                 for (int k = 0; k < 4; k++)
                     for (int l = 0; l < 4; l++) {
                         globalTransformations[j * 16 + k * 4 + l] = 0;
@@ -77,8 +79,10 @@ namespace surfelwarp {
     ) {
         auto localTransformations = DeviceArray<float>(JOINT_NUM * 16);
 
-        device::LocalTransform<<<1,JOINT_NUM,0,stream>>>(joints, poseRotation, localTransformations);
-        device::GlobalTransform<<<1,1,0,stream>>>(localTransformations, JOINT_NUM, globalTransformations);
+        device::LocalTransform<<<1,JOINT_NUM,0,stream>>>(joints, m__kinematicTree,
+                poseRotation, localTransformations);
+        device::GlobalTransform<<<1,1,0,stream>>>(localTransformations, m__kinematicTree,
+                JOINT_NUM, globalTransformations);
         device::Transform<<<1,JOINT_NUM,0,stream>>>(joints, globalTransformations);
     }
 }

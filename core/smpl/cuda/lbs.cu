@@ -1,6 +1,6 @@
 #include <vector>
 #include <cmath>
-#include "core/smpl/def.cuh"
+#include "core/smpl/def.h"
 #include "core/smpl/smpl.h"
 #include "common/common_types.h"
 #include "common/Constants.h"
@@ -8,6 +8,7 @@
 namespace surfelwarp {
     namespace device {
         __global__ void FindKNN1(
+                const PtrSz<const float> templateRestShape,
                 const PtrSz<const float> shapeBlendShape,
                 const int vertexnum,
                 const PtrSz<const float> curvertices,
@@ -18,7 +19,7 @@ namespace surfelwarp {
             int ind = i * vertexnum + j;
             dist[ind] = 0;
             for (int k = 0; k < 3; k++) {
-                float restShape = m__templateRestShape[j * 3 + k] + shapeBlendShape[j * 3 + k];
+                float restShape = templateRestShape[j * 3 + k] + shapeBlendShape[j * 3 + k];
                 dist[ind] += (curvertices[i * 3 + k] - restShape) * (curvertices[i * 3 + k] - restShape);
             }
         }
@@ -78,25 +79,26 @@ namespace surfelwarp {
 
         __global__ void mark_body_nodes(
                 const DeviceArrayView<float4> reference_vertex,
+                const PtrSz<const float> templateRestShape,
                 const PtrSz<const float> shapeBlendShape,
                 const int max_dist,
                 PtrSz<bool> on_body
         ) {
             //int i = threadIdx.x; // reference vertex size
             int j = blockIdx.x; // smpl size
-            if (3 * (j + 1) >= shapeBlendShape.size)
+            if (3 * (j + 1) >= shapeBlendShape.size) // || i >= reference_vertex.Size())
                 return;
 
-            for (int i = 0; i < reference_vertex.Size(); i++) {
-                float dist = 0;
-                const float cur[3] = {reference_vertex[i].x, reference_vertex[i].y, reference_vertex[i].z};
-                for (int k = 0; k < 3; k++) {
-                    float restShape = m__templateRestShape[j * 3 + k] + shapeBlendShape[j * 3 + k];
+	    for (int i = 0; i < reference_vertex.Size(); i++) {
+            	float dist = 0;
+            	const float cur[3] = {reference_vertex[i].x, reference_vertex[i].y, reference_vertex[i].z};
+            	for (int k = 0; k < 3; k++) {
+                    float restShape = templateRestShape[j * 3 + k] + shapeBlendShape[j * 3 + k];
                     dist += (cur[k] - restShape) * (cur[k] - restShape);
-                }
-                if (dist <= max_dist)
-                    on_body[i] = true;
-            }
+            	}
+            	if (dist <= max_dist)
+                	on_body[i] = true;
+	    }
         }
 
         __global__ void copy_body_nodes(
@@ -138,16 +140,16 @@ namespace surfelwarp {
         auto cur_weights = DeviceArray<float>(vertices.size() * JOINT_NUM);
 
         // find k nearest neigbours
-        device::FindKNN1<<<vertices.size(),VERTEX_NUM>>>(sshapeBlendShape, VERTEX_NUM, vertices, dist);
+        device::FindKNN1<<<vertices.size(),VERTEX_NUM>>>(m__templateRestShape, sshapeBlendShape, VERTEX_NUM, vertices, dist);
         device::FindKNN2<<<1,vertices.size()>>>(dist, VERTEX_NUM, ind);
         // calculate weights
-        device::CalculateWeights<<<vertices.size(),JOINT_NUM>>>(dist, m__weights,
-                ind,  JOINT_NUM, VERTEX_NUM, cur_weights);
+        device::CalculateWeights<<<vertices.size(),JOINT_NUM>>>(dist, m__weights, ind,  JOINT_NUM, VERTEX_NUM, cur_weights);
 
         skinning(globalTransformations, cur_weights, vertices, result_vertices, stream);
 
         cudaSafeCall(cudaDeviceSynchronize());
         cudaSafeCall(cudaGetLastError());
+        std::cout << "done\n";
     }
 
     void SMPL::SplitOnBodyVertices(
@@ -156,12 +158,14 @@ namespace surfelwarp {
             DeviceArray<float4>& farbody_points,
        	    cudaStream_t stream
     ) {
+	    std::cout << "start split\n";
         DeviceArray<float> sshapeBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
         DeviceArray<bool> marked_vertices = DeviceArray<bool>(reference_vertex.Size());
 
         shapeBlendShape(sshapeBlendShape, stream);
 
-        device::mark_body_nodes<<<VERTEX_NUM,1,0,stream>>>(reference_vertex,
+        device::mark_body_nodes<<<VERTEX_NUM,1,0,stream>>>(
+                reference_vertex, m__templateRestShape,
                 sshapeBlendShape, 2.8f * Constants::kNodeRadius, marked_vertices);
 
         bool *host_array = (bool *)malloc(sizeof(bool) * marked_vertices.size());
@@ -184,5 +188,8 @@ namespace surfelwarp {
                 printf("CUDA error: %s\n", cudaGetErrorString(error));
                 exit(-1);
         }
+        std::cout << "done\n";
+
+	    std::cout << "end split\n";
     }
 }

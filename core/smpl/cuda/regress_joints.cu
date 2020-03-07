@@ -1,5 +1,5 @@
 #include <cmath>
-#include "core/smpl/def.cuh"
+#include "core/smpl/def.h"
 #include "core/smpl/smpl.h"
 #include "common/common_types.h"
 #include <device_launch_parameters.h>
@@ -7,6 +7,7 @@
 namespace surfelwarp {
     namespace device {
         __global__ void RegressJoints1(
+                const PtrSz<const float> templateRestShape,
                 const PtrSz<const float> shapeBlendShape,
                 const PtrSz<const float> poseBlendShape,
                 PtrSz<float> restShape
@@ -14,11 +15,13 @@ namespace surfelwarp {
             const auto ind = threadIdx.x + blockDim.x * blockIdx.x;
             if (ind >= restShape.size)
                 return;
-            restShape[ind] = m__templateRestShape[ind] + shapeBlendShape[ind] + poseBlendShape[ind];
+            restShape[ind] = templateRestShape[ind] + shapeBlendShape[ind] + poseBlendShape[ind];
         }
 
         __global__ void RegressJoints2(
+                const PtrSz<const float> templateRestShape,
                 const PtrSz<const float> shapeBlendShape,
+                const PtrSz<const float> jointRegressor,
                 const int vertexnum,
                 PtrSz<float> joints
         ) {
@@ -30,8 +33,8 @@ namespace surfelwarp {
              int l = threadIdx.x;
             joints[ind] = 0;
             for (int k = 0; k < vertexnum; k++)
-                joints[ind] += (m__templateRestShape[k * 3 + l] +
-                        shapeBlendShape[k * 3 + l]) * m__jointRegressor[j * vertexnum + k];
+                joints[ind] += (templateRestShape[k * 3 + l] +
+                        shapeBlendShape[k * 3 + l]) * jointRegressor[j * vertexnum + k];
         }
     }
 
@@ -42,7 +45,9 @@ namespace surfelwarp {
             DeviceArray<float> &joints,
             cudaStream_t stream
     ) {
-        device::RegressJoints1<<<VERTEX_NUM,3,0,stream>>>(shapeBlendShape, poseBlendShape, restShape);
-        device::RegressJoints2<<<JOINT_NUM,3,0,stream>>>(shapeBlendShape, VERTEX_NUM, joints);
+        device::RegressJoints1<<<VERTEX_NUM,3,0,stream>>>(m__templateRestShape,
+                shapeBlendShape, poseBlendShape, restShape);
+        device::RegressJoints2<<<JOINT_NUM,3,0,stream>>>(m__templateRestShape,
+                shapeBlendShape, m__jointRegressor, VERTEX_NUM, joints);
     }
 }
