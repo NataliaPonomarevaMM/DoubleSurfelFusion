@@ -12,6 +12,7 @@
 #include "core/render/Renderer.h"
 #include "core/SurfelGeometry.h"
 #include "core/WarpField.h"
+#include "core/smpl/smpl.h"
 #include "core/warp_solver/SolverIterationData.h"
 #include "core/warp_solver/ImageTermKNNFetcher.h"
 #include "core/warp_solver/DenseDepthHandler.h"
@@ -41,6 +42,7 @@ namespace surfelwarp {
 		Renderer::SolverMaps m_rendered_maps;
 		SurfelGeometry::SolverInput m_geometry_input;
 		WarpField::SolverInput m_warpfield_input;
+        SMPL::SolverInput m_smpl_input;
 		mat34 m_world2camera;
 		
 		//The interation data maintained by the solver
@@ -63,6 +65,7 @@ namespace surfelwarp {
 			Renderer::SolverMaps rendered_maps,
 			SurfelGeometry::SolverInput geometry_input,
 			WarpField::SolverInput warpfield_input,
+            SMPL::SolverInput smpl_input,
 			const Matrix4f& world2camera
 		);
 		void SetSolverInputs(
@@ -70,6 +73,7 @@ namespace surfelwarp {
 			Renderer::SolverMaps rendered_maps,
 			SurfelGeometry::SolverInput geometry_input,
 			WarpField::SolverInput warpfield_input,
+            SMPL::SolverInput smpl_input,
 			const mat34& world2camera
 		);
 		

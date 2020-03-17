@@ -5,6 +5,7 @@
 #include "core/warp_solver/solver_constants.h"
 #include "core/warp_solver/solver_types.h"
 #include "core/warp_solver/huber_weight.h"
+#include "core/smpl/cuda/apply.cuh"
 
 namespace surfelwarp { namespace device {
 	
@@ -12,7 +13,7 @@ namespace surfelwarp { namespace device {
 	/**
 	 * \brief The dense depth term jacobian and residual, will be used only in handler class
 	 */
-	__host__ __device__ __forceinline__ void computePointToPlaneICPTermJacobianResidual(
+	__host__ __device__ __forceinline__ void computePointToPlaneICPFarBodyTermJacobianResidual(
 		const float4& depth_vertex_confid,
 		const float4& depth_normal_radius,
 		const float4& can_vertex4,
@@ -43,6 +44,34 @@ namespace surfelwarp { namespace device {
 		twist_graident.rotation = cross(warped_vertex, depth_world_normal);
 		twist_graident.translation = depth_world_normal;
 	}
+
+    __host__ __device__ __forceinline__ void computePointToPlaneICPOnBodyTermJacobianResidual(
+            const float4& depth_vertex_confid,
+            const float4& depth_normal_radius,
+            const ushort4& knn, const float4& knn_weight,
+            //The warp field
+            const PtrSz<const float> smpl_vertices,
+            const mat34& camera2world,
+            //The output
+            TwistGradientOfScalarCost& twist_graident,
+            float& residual
+    ) {
+        //Correct the size
+        const float3 depth_vertex = make_float3(depth_vertex_confid.x, depth_vertex_confid.y, depth_vertex_confid.z);
+        const float3 depth_normal = make_float3(depth_normal_radius.x, depth_normal_radius.y, depth_normal_radius.z);
+
+        //Warp it
+        const float3 warped_vertex = apply(smpl_vertices, knn, knn_weight);
+
+        //Warp the depth vertex to world frame
+        const float3 depth_world_normal = camera2world.rot * depth_normal;
+        const float3 depth_world_vertex = camera2world.rot * depth_vertex + camera2world.trans;
+
+        //Compute the residual terms
+        residual = dot(depth_world_normal, warped_vertex - depth_world_vertex);
+        twist_graident.rotation = cross(warped_vertex, depth_world_normal);
+        twist_graident.translation = depth_world_normal;
+    }
 
 
 	/**

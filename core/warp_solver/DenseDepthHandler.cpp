@@ -55,6 +55,11 @@ void surfelwarp::DenseDepthHandler::ReleaseBuffer() {
 void surfelwarp::DenseDepthHandler::SetInputs(
 	const DeviceArrayView<DualQuaternion>& node_se3,
 	const DeviceArrayView2D<KNNAndWeight>& knn_map,
+	//smpl
+    const DeviceArrayView<float> smpl_vertices,
+    const DeviceArrayView<ushort4> smpl_knn,
+    const DeviceArrayView<float4> smpl_knn_weight,
+    const DeviceArrayView<int> onbody,
 	cudaTextureObject_t depth_vertex_map, cudaTextureObject_t depth_normal_map,
 	//The rendered maps
 	cudaTextureObject_t reference_vertex_map,
@@ -78,6 +83,12 @@ void surfelwarp::DenseDepthHandler::SetInputs(
 	m_geometry_maps.index_map = index_map;
 	
 	m_potential_pixels_knn = pixels_knn;
+
+    //smpl
+    m_smpl_vertices = smpl_vertices;
+    m_smpl_knn = smpl_knn;
+    m_smpl_knn_weight = smpl_knn_weight;
+    m_onbody = onbody;
 }
 
 void surfelwarp::DenseDepthHandler::UpdateNodeSE3(surfelwarp::DeviceArrayView<surfelwarp::DualQuaternion> node_se3) {

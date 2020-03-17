@@ -30,9 +30,9 @@ namespace surfelwarp {
 
 		//The processing interface
 		void InitializeReferenceNodeAndSE3FromVertex(
-		        const DeviceArrayView<float4>& reference_vertex,
+                const DeviceArrayView<float4>& onbody_vertex,
+                const DeviceArrayView<float4>& farbody_vertex,
 		        WarpField::Ptr warp_field,
-                SMPL::Ptr smpl,
 		        cudaStream_t stream = 0);
 
 

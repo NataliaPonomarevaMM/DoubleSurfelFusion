@@ -38,12 +38,9 @@ namespace surfelwarp {
 
     void SMPL::skinning(
             const DeviceArray<float> &transformation,
-            const DeviceArray<float> &custom_weights,
-            const DeviceArray<float> &vertices,
-            DeviceArray<float> &result_vertices,
             cudaStream_t stream
     ) {
-        device::Skinning<<<VERTEX_NUM,1,0,stream>>>(vertices, transformation, custom_weights,
-               JOINT_NUM, result_vertices);
+        device::Skinning<<<VERTEX_NUM,1,0,stream>>>(m_restShape, transformation,  m__weights,
+               JOINT_NUM, m_smpl_vertices);
     }
 }

@@ -31,6 +31,12 @@ namespace surfelwarp {
 		mat34 m_world2camera;
 		mat34 m_camera2world;
 
+		//Info from smpl
+        DeviceArrayView<float> m_smpl_vertices;
+        DeviceArrayView<ushort4> m_smpl_knn;
+        DeviceArrayView<float4> m_smpl_knn_weight;
+        DeviceArrayView<int> m_onbody;
+
 		//The info from depth input
 		struct {
 			cudaTextureObject_t vertex_map;
@@ -61,6 +67,11 @@ namespace surfelwarp {
 		void SetInputs(
 			const DeviceArrayView<DualQuaternion>& node_se3,
 			const DeviceArrayView2D<KNNAndWeight>& knn_map,
+			//smpl
+            const DeviceArrayView<float> smpl_vertices,
+            const DeviceArrayView<ushort4> smpl_knn,
+            const DeviceArrayView<float4> smpl_knn_weight,
+            const DeviceArrayView<int> onbody,
 			cudaTextureObject_t depth_vertex_map, cudaTextureObject_t depth_normal_map,
 			//The rendered maps
 			cudaTextureObject_t reference_vertex_map,

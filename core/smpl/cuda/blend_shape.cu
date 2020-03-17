@@ -100,8 +100,8 @@ namespace surfelwarp {
     }
 
     void SMPL::shapeBlendShape(
-            DeviceArray<float> &sshapeBlendShape,
+            DeviceArray<float> &shapeBlendShape,
             cudaStream_t stream) {
-        device::ShapeBlend<<<VERTEX_NUM,3,0,stream>>>(m__beta, m__shapeBlendBasis, SHAPE_BASIS_DIM, sshapeBlendShape);
+        device::ShapeBlend<<<VERTEX_NUM,3,0,stream>>>(m__beta, m__shapeBlendBasis, SHAPE_BASIS_DIM, shapeBlendShape);
     }
 }

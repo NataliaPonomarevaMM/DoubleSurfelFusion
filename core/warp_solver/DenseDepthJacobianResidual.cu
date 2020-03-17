@@ -12,9 +12,14 @@ namespace surfelwarp { namespace device {
 		cudaTextureObject_t	depth_vertex_confid_map,
 		cudaTextureObject_t depth_normal_radius_map,
 		cudaTextureObject_t reference_vertex_map,
+        cudaTextureObject_t index_map,
+        const float* smpl_vertices,
+        const ushort4* smpl_knn,
+        const float4* smpl_knn_weight,
+        const int* onbody,
 		const DeviceArrayView<ushort4> correspond_pixel_pair,
 		const ushort4* pixel_knn,
-		const float4* pixel_knn_weight,
+        const float4* pixel_knn_weight,
 		const DualQuaternion* node_se3,
 		const mat34 camera2world,
 		//Output
@@ -26,31 +31,51 @@ namespace surfelwarp { namespace device {
 		{
 			//Request informations
 			const ushort4 pixel_pair = correspond_pixel_pair[idx];
-			const ushort4 knn = pixel_knn[idx];
-			const float4 knn_weight = pixel_knn_weight[idx];
 			const float4 reference_vertex = tex2D<float4>(reference_vertex_map, pixel_pair.x, pixel_pair.y);
+            const auto reference_index = tex2D<unsigned>(index_map, pixel_pair.x, pixel_pair.y);
 			const float4 depth_vertex_confid = tex2D<float4>(depth_vertex_confid_map, pixel_pair.z, pixel_pair.w);
 			const float4 depth_normal_radius = tex2D<float4>(depth_normal_radius_map, pixel_pair.z, pixel_pair.w);
 
-			//Compute it
-			computePointToPlaneICPTermJacobianResidual(
-				depth_vertex_confid,
-				depth_normal_radius, 
-				reference_vertex, 
-				knn, knn_weight,
-				//Deformation
-				node_se3, 
-				camera2world,
-				//The output
-				twist_gradient[idx],
-				residual[idx]
-			);
+			if (onbody[reference_index] != -1) {
+			    const int ind = onbody[reference_index];
+			    // should warp smpl
+                const ushort4 knn = smpl_knn[ind];
+                const float4 knn_weight = smpl_knn_weight[ind];
+                //Compute it
+                computePointToPlaneICPOnBodyTermJacobianResidual(
+                        depth_vertex_confid,
+                        depth_normal_radius,
+                        knn, knn_weight,
+                        //Deformation
+                        smpl_vertices,
+                        camera2world,
+                        //The output
+                        twist_gradient[idx],
+                        residual[idx]
+                );
+			} else {
+                const ushort4 knn = pixel_knn[idx];
+                const float4 knn_weight = pixel_knn_weight[idx];
+                //Compute it
+                computePointToPlaneICPFarBodyTermJacobianResidual(
+                        depth_vertex_confid,
+                        depth_normal_radius,
+                        reference_vertex,
+                        knn, knn_weight,
+                        //Deformation
+                        node_se3,
+                        camera2world,
+                        //The output
+                        twist_gradient[idx],
+                        residual[idx]
+                );
+            }
 		}
 	}
 
 
 	//This version needs to first check whether the given vertex will result in a match. If there is
-	//a correspondence, the fill in the jacobian and residual values, else mark the value to zero. 
+	//a correspondence, the fill in the jacobian and residual values, else mark the value to zero.
 	//The input is only depended on the SE(3) of the nodes, which can be updated without rebuild the index
 	__global__ void computeDenseDepthJacobianKernel(
 		cudaTextureObject_t depth_vertex_confid_map,
@@ -118,12 +143,12 @@ namespace surfelwarp { namespace device {
 			if(is_zero_vertex(depth_vertex4)) {
 				valid_pair = false;
 			}
-			
+
 			//The orientation is not matched
 			if (dot(depth_normal, warped_normal_camera) < d_correspondence_normal_dot_threshold) {
 				valid_pair = false;
 			}
-			
+
 			//The distance is too far away
 			if (squared_norm(depth_vertex - warped_vertex_camera) > d_correspondence_distance_threshold_square) {
 				valid_pair = false;
@@ -162,6 +187,11 @@ void surfelwarp::DenseDepthHandler::ComputeJacobianTermsFreeIndex(cudaStream_t s
 		m_depth_observation.vertex_map,
 		m_depth_observation.normal_map, 
 		m_geometry_maps.reference_vertex_map,
+		m_geometry_maps.index_map,
+		m_smpl_vertices.RawPtr(),
+		m_smpl_knn.RawPtr(),
+		m_smpl_knn_weight.RawPtr(),
+		m_onbody.RawPtr(),
 		//Pixels and KNN
 		m_valid_pixel_pairs.ArrayView(),
 		m_dense_depth_knn.Ptr(),

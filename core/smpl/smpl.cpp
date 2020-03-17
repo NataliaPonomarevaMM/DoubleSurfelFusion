@@ -33,38 +33,31 @@ namespace surfelwarp {
         m__theta.upload(data_arr + 3, 72);
         m__beta.upload(data_arr + 75, 10);
 
-        cudaSafeCall(cudaDeviceSynchronize());
-        cudaSafeCall(cudaGetLastError());
+        m_restShape = DeviceArray<float>(VERTEX_NUM * 3);
+        m_smpl_vertices = DeviceArray<float>(VERTEX_NUM * 3);
     }
 
-    SMPL::~SMPL() {
-        m__poseBlendBasis.release();
-        m__shapeBlendBasis.release();
-        m__templateRestShape.release();
-        m__jointRegressor.release();
-        m__kinematicTree.release();
-        m__weights.release();
-    }
-
-    void SMPL::LbsModel(
-            DeviceArray<float> &result_vertices,
-            cudaStream_t stream
-    ) {
+    void SMPL::LbsModel(cudaStream_t stream) {
 	    auto poseRotation = DeviceArray<float>(JOINT_NUM * 9);
         auto restPoseRotation = DeviceArray<float>(JOINT_NUM * 9);
-        auto pposeBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
-        auto sshapeBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
-        auto restShape = DeviceArray<float>(VERTEX_NUM * 3);
+        auto poseBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
+        auto shapeBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
         auto joints = DeviceArray<float>(JOINT_NUM * 3);
         auto globalTransformations = DeviceArray<float>(JOINT_NUM * 16);
 
-        poseBlendShape(poseRotation, restPoseRotation, pposeBlendShape, stream);
-        shapeBlendShape(sshapeBlendShape, stream);
-        regressJoints(sshapeBlendShape, pposeBlendShape, restShape, joints, stream);
+        countPoseBlendShape(poseRotation, restPoseRotation, poseBlendShape, stream);
+        countShapeBlendShape(shapeBlendShape, stream);
+        regressJoints(shapeBlendShape, poseBlendShape, joints, stream);
         transform(poseRotation, joints, globalTransformations, stream);
-	skinning(globalTransformations, m__weights, restShape, result_vertices, stream);
+	    skinning(globalTransformations, stream);
+    }
 
-	cudaSafeCall(cudaDeviceSynchronize());
-	cudaSafeCall(cudaGetLastError());
+    SMPL::SolverInput SMPL::SolverAccess() const {
+        SolverInput solver_input;
+        solver_input.smpl_vertices = m_smpl_vertices;
+        solver_input.knn = m_knn;
+        solver_input.knn_weight = m_knn_weight;
+        solver_input.onbody = m_onbody;
+        return solver_input;
     }
 } // namespace smpl

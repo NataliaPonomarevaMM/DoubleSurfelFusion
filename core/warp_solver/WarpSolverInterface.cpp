@@ -6,6 +6,7 @@ void surfelwarp::WarpSolver::SetSolverInputs(
 	Renderer::SolverMaps rendered_maps,
 	SurfelGeometry::SolverInput geometry_input,
 	WarpField::SolverInput warpfield_input,
+    SMPL::SolverInput smpl_input,
 	const mat34 &world2camera
 ) {
 	m_observation = observation;
@@ -13,6 +14,7 @@ void surfelwarp::WarpSolver::SetSolverInputs(
 	m_geometry_input = geometry_input;
 	m_warpfield_input = warpfield_input;
 	m_world2camera = world2camera;
+	m_smpl_input = smpl_input;
 	
 	//The iteration data
 	m_iteration_data.SetWarpFieldInitialValue(warpfield_input.node_se3);
@@ -24,6 +26,7 @@ void surfelwarp::WarpSolver::SetSolverInputs(
 	Renderer::SolverMaps rendered_maps,
 	SurfelGeometry::SolverInput geometry_input,
 	WarpField::SolverInput warpfield_input,
+    SMPL::SolverInput smpl_input,
 	const Matrix4f& world2camera
 ) {
 	SetSolverInputs(
@@ -31,6 +34,7 @@ void surfelwarp::WarpSolver::SetSolverInputs(
 		rendered_maps,
 		geometry_input,
 		warpfield_input,
+		smpl_input,
 		mat34(world2camera)
 	);
 }

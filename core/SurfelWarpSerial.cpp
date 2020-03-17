@@ -22,13 +22,6 @@ surfelwarp::SurfelWarpSerial::SurfelWarpSerial() {
 
 	//The SMPL model
     m_smpl_model = std::make_shared<SMPL>();
-    std::cout << "Model loaded\n";
-
-    //TEST
-	auto result_vertices = DeviceArray<float>(VERTEX_NUM * 3);
-    m_smpl_model->LbsModel(result_vertices);
-	result_vertices.release();
-	std::cout << "end smpl\n";
 
 	//Construct the image processor
 	FetchInterface::Ptr fetcher = std::make_shared<GenericFileFetch>(config.data_path());
@@ -92,7 +85,11 @@ void surfelwarp::SurfelWarpSerial::ProcessFirstFrame() {
 	
 	//Build the reference vertex and SE3 for the warp field
 	const auto reference_vertex = m_surfel_geometry[m_updated_geometry_index]->GetReferenceVertexConfidence();
-	m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(reference_vertex, m_warp_field, m_smpl_model);
+    DeviceArray<float4> onbody, farbody;
+    m_smpl_model->LbsModel();
+    m_smpl_model->Split(reference_vertex, onbody, farbody);
+    std::cout << reference_vertex.Size() << " " << onbody.size() << " " << farbody.size() << "\n";
+	m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(onbody, farbody, m_warp_field);
 	
 	//Build the index and skinning nodes and surfels
 	m_warp_field->BuildNodeGraph();
@@ -146,6 +143,11 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 	//The resource from geometry attributes
 	const auto solver_geometry = m_surfel_geometry[m_updated_geometry_index]->SolverAccess();
 	const auto solver_warpfield = m_warp_field->SolverAccess();
+
+	//SMPL info
+    m_smpl_model->LbsModel();
+    m_smpl_model->CountKnn();
+	const auto solver_smpl = m_smpl_model->SolverAccess();
 	
 	//Pass the input to warp solver
 	m_warp_solver->SetSolverInputs(
@@ -153,6 +155,7 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 		solver_maps,
 		solver_geometry,
 		solver_warpfield,
+        solver_smpl,
 		m_camera.GetWorld2Camera() //The world to camera might be updated by rigid solver
 	);
 	
@@ -214,8 +217,11 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 		
 		//Reinit the warp field
 		const auto reference_vertex = m_surfel_geometry[fused_geometry_idx]->GetReferenceVertexConfidence();
-		m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(reference_vertex, m_warp_field, m_smpl_model);
-		
+        DeviceArray<float4> onbody, farbody;
+        m_smpl_model->Split(reference_vertex, onbody, farbody);
+        std::cout << reference_vertex.Size() << " " << onbody.size() << " " << farbody.size() << "\n";
+        m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(onbody, farbody, m_warp_field);
+
 		//Build the index and skinning nodes and surfels
 		m_warp_field->BuildNodeGraph();
 		

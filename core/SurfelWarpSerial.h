@@ -35,7 +35,6 @@ namespace surfelwarp {
 
 		//SMPL Model
 		SMPL::Ptr m_smpl_model;
-		DeviceArray<float> m_theta, m_beta;
 
 		//The surfel geometry and their updater
 		SurfelGeometry::Ptr m_surfel_geometry[2];
