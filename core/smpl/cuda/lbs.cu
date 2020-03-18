@@ -35,7 +35,7 @@ namespace surfelwarp {
                 const DeviceArrayView<float4> reference_vertex,
                 const PtrSz<const bool> on_body,
                 PtrSz<float4> onbody_points,
-                PtrSz<float4> farbody_points,
+                PtrSz<float4> farbody_points
         ) {
             int on = 0, far = 0;
             for (int i = 0; i < reference_vertex.Size(); i++) {
@@ -55,7 +55,7 @@ namespace surfelwarp {
             int on = 0;
             for (int i = 0; i < reference_vertex.Size(); i++) {
                 if (on_body[i]) {
-                    onbody_ind[on] = i;
+                    knn_ind[on] = i;
                     reverse_ind[i] = on++;
                 } else
                     reverse_ind[i] = -1;
@@ -69,10 +69,10 @@ namespace surfelwarp {
                 PtrSz<ushort4> knn
         ) {
             int i = blockIdx.x; // num
-            if (i >= onbody_ind.size)
+            if (i >= knn_ind.size)
                 return;
 
-            int dist_ind = onbody_ind[i] * vertexnum;
+            int dist_ind = knn_ind[i] * vertexnum;
 
             int ind[4];
             for (int l = 0; l < 4; l++)
@@ -104,11 +104,11 @@ namespace surfelwarp {
                 const int vertexnum,
                 PtrSz<float4> weights
         ) {
-            int i = blockIdx.x; // num of reference vertex
-            if (i >= on_body.size || !on_body[i])
+            int i = blockIdx.x; // num 
+            if (i >= knn_ind.size)
                 return;
 
-            int dist_ind = onbody_ind[i] * vertexnum;
+            int dist_ind = knn_ind[i] * vertexnum;
             float4 weight;
             weight.x = __expf(-dist[dist_ind + knn[i].x]/ (2 * d_node_radius_square));
             weight.y = __expf(-dist[dist_ind + knn[i].y] / (2 * d_node_radius_square));
@@ -124,10 +124,10 @@ namespace surfelwarp {
             DeviceArray<float4>& farbody_points,
             cudaStream_t stream
     ) {
-        auto dist = DeviceArray<float>(vertices.size() * VERTEX_NUM);
+        auto dist = DeviceArray<float>(reference_vertex.Size() * VERTEX_NUM);
         auto marked_vertices = DeviceArray<bool>(reference_vertex.Size());
 
-        device::count_distance<<<vertices.size(),1,0,stream>>>(reference_vertex, m_restShape,
+        device::count_distance<<<reference_vertex.Size(),1,0,stream>>>(reference_vertex, m_restShape,
                 2.8f * Constants::kNodeRadius, VERTEX_NUM, dist, marked_vertices);
 
         //split on ondoby and farbody
@@ -148,10 +148,10 @@ namespace surfelwarp {
             const DeviceArrayView<float4>& reference_vertex,
             cudaStream_t stream
     ) {
-        auto dist = DeviceArray<float>(vertices.size() * VERTEX_NUM);
+        auto dist = DeviceArray<float>(reference_vertex.Size() * VERTEX_NUM);
         auto marked_vertices = DeviceArray<bool>(reference_vertex.Size());
 
-        device::count_distance<<<vertices.size(),1,0,stream>>>(reference_vertex, m_restShape,
+        device::count_distance<<<reference_vertex.Size(),1,0,stream>>>(reference_vertex, m_restShape,
                 2.8f * Constants::kNodeRadius, VERTEX_NUM, dist, marked_vertices);
 
         //split on ondoby and farbody
@@ -170,8 +170,8 @@ namespace surfelwarp {
         m_knn_weight = DeviceArray<float4>(num);
 
         //find 4 nearest neighbours
-        device::findKNN<<<vertices.size(),1,0,stream>>>(dist, knn_ind, VERTEX_NUM, m_knn);
-        device::calculate_weights<<<vertices.size(),1,0,stream>>>(dist, m_knn, knn_ind,
+        device::findKNN<<<num,1,0,stream>>>(dist, knn_ind, VERTEX_NUM, m_knn);
+        device::calculate_weights<<<num,1,0,stream>>>(dist, m_knn, knn_ind,
                 VERTEX_NUM, m_knn_weight);
     }
 }

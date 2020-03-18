@@ -3,11 +3,10 @@
 
 namespace surfelwarp {
     namespace device {
-        __global__ float3 apply(
-                        const PtrSz<const float> smpl_vertices,
-                        const ushort4 knn,
-                        const float4 knn_weight,
-                        cudaStream_t stream
+        __host__ __device__ __forceinline__ float3 apply(
+                        const float* smpl_vertices,
+                        const ushort4& knn,
+                        const float4& knn_weight
         ) {
             float coord[3];
             for (int k = 0; k < 3; k++) {

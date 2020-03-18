@@ -89,7 +89,8 @@ void surfelwarp::SurfelWarpSerial::ProcessFirstFrame() {
     m_smpl_model->LbsModel();
     m_smpl_model->Split(reference_vertex, onbody, farbody);
     std::cout << reference_vertex.Size() << " " << onbody.size() << " " << farbody.size() << "\n";
-	m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(onbody, farbody, m_warp_field);
+	m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(
+		DeviceArrayView<float4>(onbody), DeviceArrayView<float4>(farbody), m_warp_field);
 	
 	//Build the index and skinning nodes and surfels
 	m_warp_field->BuildNodeGraph();
@@ -146,7 +147,8 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 
 	//SMPL info
     m_smpl_model->LbsModel();
-    m_smpl_model->CountKnn();
+	const auto reference_vertex = m_surfel_geometry[m_updated_geometry_index]->GetReferenceVertexConfidence();
+    m_smpl_model->CountKnn(reference_vertex);
 	const auto solver_smpl = m_smpl_model->SolverAccess();
 	
 	//Pass the input to warp solver
@@ -220,7 +222,8 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
         DeviceArray<float4> onbody, farbody;
         m_smpl_model->Split(reference_vertex, onbody, farbody);
         std::cout << reference_vertex.Size() << " " << onbody.size() << " " << farbody.size() << "\n";
-        m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(onbody, farbody, m_warp_field);
+        m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(
+		 DeviceArrayView<float4>(onbody), DeviceArrayView<float4>(farbody), m_warp_field);
 
 		//Build the index and skinning nodes and surfels
 		m_warp_field->BuildNodeGraph();
