@@ -25,14 +25,14 @@ namespace surfelwarp {
         DeviceArray<int64_t> m__kinematicTree; // Hierarchy relation between joints, the root is at the belly button, (2, 24).
 
         ///useful information to store
-        int m_vert_frame;
+        int m_vert_frame = -1;
         DeviceArray<float> m_restShape;
         DeviceArray<float> m_smpl_vertices;
-        int m_dist_frame;
+        int m_dist_frame = -1;
         DeviceArray<float> m_dist;
         int m_num_marked;
         DeviceArray<bool> m_marked_vertices;
-        int m_knn_frame;
+        int m_knn_frame = -1;
         DeviceArray<ushort4> m_knn;
         DeviceArray<float4> m_knn_weight;
         DeviceArray<int> m_onbody;
@@ -69,7 +69,6 @@ namespace surfelwarp {
     public:
         using Ptr = std::shared_ptr<SMPL>;
         SMPL();
-        ~SMPL();
         SURFELWARP_NO_COPY_ASSIGN_MOVE(SMPL);
 
         void Split(
@@ -89,7 +88,7 @@ namespace surfelwarp {
         SolverInput SolverAccess(
                 const DeviceArrayView<float4>& live_vertex,
                 const int frame_idx,
-                cudaStream_t stream = 0) const;
+                cudaStream_t stream = 0);
     };
 } // namespace smpl
 #endif // SMPL_H

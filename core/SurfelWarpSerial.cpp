@@ -85,7 +85,7 @@ void surfelwarp::SurfelWarpSerial::ProcessFirstFrame() {
 	
 	//Build the reference vertex and SE3 for the warp field
 	const auto reference_vertex = m_surfel_geometry[m_updated_geometry_index]->ReferenceVertexConfidence();
-    const auto live_vertex = m_surfel_geometry[m_updated_geometry_index]->LivepVertexConfidence();
+    const auto live_vertex = m_surfel_geometry[m_updated_geometry_index]->LiveVertexConfidence();
     DeviceArray<float4> onbody, farbody;
     m_smpl_model->Split(live_vertex, reference_vertex, m_frame_idx, onbody, farbody);
 	m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(
@@ -259,7 +259,7 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 		
 		//Extend the warp field reference nodes and SE3
 		const auto prev_node_size = m_warp_field->CheckAndGetNodeSize();
-		const float4* appended_vertex_ptr = m_surfel_geometry[fused_geometry_idx]->ReferenceVertexArray().RawPtr() + num_remaining_surfel;
+		const float4* appended_vertex_ptr = m_surfel_geometry[fused_geometry_idx]->ReferenceVertexConfidence().RawPtr() + num_remaining_surfel;
 		DeviceArrayView<float4> appended_vertex_view(appended_vertex_ptr, num_appended_surfel);
 		const ushort4* appended_knn_ptr = m_surfel_geometry[fused_geometry_idx]->SurfelKNNArray().RawPtr() + num_remaining_surfel;
 		DeviceArrayView<ushort4> appended_surfel_knn(appended_knn_ptr, num_appended_surfel);

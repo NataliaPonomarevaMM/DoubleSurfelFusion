@@ -125,7 +125,7 @@ namespace surfelwarp {
         m_dist = DeviceArray<float>(live_vertex.Size() * VERTEX_NUM);
         m_marked_vertices = DeviceArray<bool>(live_vertex.Size());
 
-        device::count_distance<<<reference_vertex.Size(),1,0,stream>>>(live_vertex, m_restShape,
+        device::count_distance<<<live_vertex.Size(),1,0,stream>>>(live_vertex, m_restShape,
                 2.8f * Constants::kNodeRadius, VERTEX_NUM, m_dist, m_marked_vertices);
         bool *host_array = (bool *)malloc(sizeof(bool) * m_marked_vertices.size());
         m_marked_vertices.download(host_array);
@@ -153,7 +153,7 @@ namespace surfelwarp {
         }
         onbody_points = DeviceArray<float4>(m_num_marked);
         farbody_points = DeviceArray<float4>(reference_vertex.Size() - m_num_marked);
-        device::copy_body_nodes<<<1,1,0,stream>>>(reference_vertex, marked_vertices,
+        device::copy_body_nodes<<<1,1,0,stream>>>(reference_vertex, m_marked_vertices,
                 onbody_points, farbody_points);
     }
 
@@ -178,7 +178,7 @@ namespace surfelwarp {
         m_knn_weight = DeviceArray<float4>(m_num_marked);
 
         //find 4 nearest neighbours
-        device::findKNN<<<num,1,0,stream>>>(m_dist, knn_ind, VERTEX_NUM, m_knn);
+        device::findKNN<<<m_num_marked,1,0,stream>>>(m_dist, knn_ind, VERTEX_NUM, m_knn);
         device::calculate_weights<<<m_num_marked,1,0,stream>>>(m_dist, m_knn, knn_ind,
                 VERTEX_NUM, m_knn_weight);
     }
