@@ -52,7 +52,16 @@ namespace surfelwarp {
 	    skinning(globalTransformations, stream);
     }
 
-    SMPL::SolverInput SMPL::SolverAccess() const {
+    SMPL::SolverInput SMPL::SolverAccess(
+            const DeviceArrayView<float4>& live_vertex,
+            const int frame_idx,
+            cudaStream_t stream) const
+    {
+        if (m_knn_frame != frame_idx) {
+            CountKnn(live_vertex, stream);
+            m_knn_frame = frame_idx;
+        }
+
         SolverInput solver_input;
         solver_input.smpl_vertices = m_smpl_vertices;
         solver_input.knn = m_knn;

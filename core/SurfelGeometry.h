@@ -47,11 +47,7 @@ namespace surfelwarp {
 		//Set the valid size of surfels
 		size_t NumValidSurfels() const { return m_num_valid_surfels; }
 		void ResizeValidSurfelArrays(size_t size);
-		
-		//The general read-only access
-	public:
-		DeviceArrayView<float4> GetReferenceVertexConfidence() const { return m_reference_vertex_confid.ArrayView(); }
-		
+
 		/* The read-only accessed by solver
 		 */
 	public:
@@ -96,7 +92,8 @@ namespace surfelwarp {
 		
 		/* The read-only access to memebers
 		 */
-		DeviceArrayView<float4> ReferenceVertexArray() const { return m_reference_vertex_confid.ArrayView(); }
+        DeviceArrayView<float4> ReferenceVertexConfidence() const { return m_reference_vertex_confid.ArrayView(); }
+        DeviceArrayView<float4> LiveVertexConfidence() const { return m_live_vertex_confid.ArrayView(); }
 		DeviceArrayView<ushort4> SurfelKNNArray() const { return m_surfel_knn.ArrayView(); }
 
 		

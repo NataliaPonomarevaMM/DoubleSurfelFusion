@@ -84,11 +84,10 @@ void surfelwarp::SurfelWarpSerial::ProcessFirstFrame() {
 	m_geometry_initializer->InitFromObservationSerial(*m_surfel_geometry[m_updated_geometry_index], surfel_array);
 	
 	//Build the reference vertex and SE3 for the warp field
-	const auto reference_vertex = m_surfel_geometry[m_updated_geometry_index]->GetReferenceVertexConfidence();
+	const auto reference_vertex = m_surfel_geometry[m_updated_geometry_index]->ReferenceVertexConfidence();
+    const auto live_vertex = m_surfel_geometry[m_updated_geometry_index]->LivepVertexConfidence();
     DeviceArray<float4> onbody, farbody;
-    m_smpl_model->LbsModel();
-    m_smpl_model->Split(reference_vertex, onbody, farbody);
-    std::cout << reference_vertex.Size() << " " << onbody.size() << " " << farbody.size() << "\n";
+    m_smpl_model->Split(live_vertex, reference_vertex, m_frame_idx, onbody, farbody);
 	m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(
 		DeviceArrayView<float4>(onbody), DeviceArrayView<float4>(farbody), m_warp_field);
 	
@@ -146,10 +145,8 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 	const auto solver_warpfield = m_warp_field->SolverAccess();
 
 	//SMPL info
-    m_smpl_model->LbsModel();
-	const auto reference_vertex = m_surfel_geometry[m_updated_geometry_index]->GetReferenceVertexConfidence();
-    m_smpl_model->CountKnn(reference_vertex);
-	const auto solver_smpl = m_smpl_model->SolverAccess();
+	const auto live_vertex = m_surfel_geometry[m_updated_geometry_index]->LiveVertexConfidence();
+	const auto solver_smpl = m_smpl_model->SolverAccess(live_vertex, m_frame_idx);
 	
 	//Pass the input to warp solver
 	m_warp_solver->SetSolverInputs(
@@ -218,12 +215,12 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 		//m_geometry_reinit_processor->ProcessReinitNodeErrorSerial(num_remaining_surfel, num_appended_surfel, node_error, 0.06f);
 		
 		//Reinit the warp field
-		const auto reference_vertex = m_surfel_geometry[fused_geometry_idx]->GetReferenceVertexConfidence();
+		const auto reference_vertex = m_surfel_geometry[fused_geometry_idx]->ReferenceVertexConfidence();
+        const auto live_vertex = m_surfel_geometry[fused_geometry_idx]->LiveVertexConfidence();
         DeviceArray<float4> onbody, farbody;
-        m_smpl_model->Split(reference_vertex, onbody, farbody);
-        std::cout << reference_vertex.Size() << " " << onbody.size() << " " << farbody.size() << "\n";
+        m_smpl_model->Split(live_vertex, reference_vertex, m_frame_idx, onbody, farbody);
         m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(
-		 DeviceArrayView<float4>(onbody), DeviceArrayView<float4>(farbody), m_warp_field);
+                DeviceArrayView<float4>(onbody), DeviceArrayView<float4>(farbody), m_warp_field);
 
 		//Build the index and skinning nodes and surfels
 		m_warp_field->BuildNodeGraph();

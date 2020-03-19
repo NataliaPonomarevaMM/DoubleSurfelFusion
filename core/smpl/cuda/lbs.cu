@@ -118,60 +118,68 @@ namespace surfelwarp {
         }
     }
 
+    void SMPL::MarkVertices(
+            const DeviceArrayView<float4>& live_vertex,
+            cudaStream_t stream
+    ) {
+        m_dist = DeviceArray<float>(live_vertex.Size() * VERTEX_NUM);
+        m_marked_vertices = DeviceArray<bool>(live_vertex.Size());
+
+        device::count_distance<<<reference_vertex.Size(),1,0,stream>>>(live_vertex, m_restShape,
+                2.8f * Constants::kNodeRadius, VERTEX_NUM, m_dist, m_marked_vertices);
+        bool *host_array = (bool *)malloc(sizeof(bool) * m_marked_vertices.size());
+        m_marked_vertices.download(host_array);
+        m_num_marked = 0;
+        for (int i = 0; i < m_marked_vertices.size(); i++)
+            if (host_array[i])
+                m_num_marked++;
+    }
+
     void SMPL::Split(
+            const DeviceArrayView<float4>& live_vertex,
             const DeviceArrayView<float4>& reference_vertex,
+            const int frame_idx,
             DeviceArray<float4>& onbody_points,
             DeviceArray<float4>& farbody_points,
             cudaStream_t stream
     ) {
-        auto dist = DeviceArray<float>(reference_vertex.Size() * VERTEX_NUM);
-        auto marked_vertices = DeviceArray<bool>(reference_vertex.Size());
-
-        device::count_distance<<<reference_vertex.Size(),1,0,stream>>>(reference_vertex, m_restShape,
-                2.8f * Constants::kNodeRadius, VERTEX_NUM, dist, marked_vertices);
-
-        //split on ondoby and farbody
-        bool *host_array = (bool *)malloc(sizeof(bool) * marked_vertices.size());
-        marked_vertices.download(host_array);
-        int num = 0;
-        for (int i = 0; i < marked_vertices.size(); i++)
-            if (host_array[i])
-                num++;
-
-        onbody_points = DeviceArray<float4>(num);
-        farbody_points = DeviceArray<float4>(reference_vertex.Size() - num);
+        if (m_vert_frame != frame_idx) {
+            LbsModel(stream);
+            m_vert_frame = frame_idx;
+        }
+        if (m_dist_frame != frame_idx) {
+            MarkVertices(live_vertex, stream);
+            m_dist_frame = frame_idx;
+        }
+        onbody_points = DeviceArray<float4>(m_num_marked);
+        farbody_points = DeviceArray<float4>(reference_vertex.Size() - m_num_marked);
         device::copy_body_nodes<<<1,1,0,stream>>>(reference_vertex, marked_vertices,
                 onbody_points, farbody_points);
     }
 
     void SMPL::CountKnn(
-            const DeviceArrayView<float4>& reference_vertex,
+            const DeviceArrayView<float4>& live_vertex,
+            const int frame_idx,
             cudaStream_t stream
     ) {
-        auto dist = DeviceArray<float>(reference_vertex.Size() * VERTEX_NUM);
-        auto marked_vertices = DeviceArray<bool>(reference_vertex.Size());
+        if (m_vert_frame != frame_idx) {
+            LbsModel(stream);
+            m_vert_frame = frame_idx;
+        }
+        if (m_dist_frame != frame_idx) {
+            MarkVertices(live_vertex, stream);
+            m_dist_frame = frame_idx;
+        }
+        auto knn_ind = DeviceArray<int>(m_num_marked);
+        m_onbody = DeviceArray<int>(live_vertex.Size());
+        device::fill_index<<<1,1,0,stream>>>(live_vertex, m_marked_vertices, knn_ind, m_onbody);
 
-        device::count_distance<<<reference_vertex.Size(),1,0,stream>>>(reference_vertex, m_restShape,
-                2.8f * Constants::kNodeRadius, VERTEX_NUM, dist, marked_vertices);
-
-        //split on ondoby and farbody
-        bool *host_array = (bool *)malloc(sizeof(bool) * marked_vertices.size());
-        marked_vertices.download(host_array);
-        int num = 0;
-        for (int i = 0; i < marked_vertices.size(); i++)
-            if (host_array[i])
-                num++;
-
-        auto knn_ind = DeviceArray<int>(num);
-        m_onbody = DeviceArray<int>(reference_vertex.Size());
-        device::fill_index<<<1,1,0,stream>>>(reference_vertex, marked_vertices, knn_ind, m_onbody);
-
-        m_knn = DeviceArray<ushort4>(num);
-        m_knn_weight = DeviceArray<float4>(num);
+        m_knn = DeviceArray<ushort4>(m_num_marked);
+        m_knn_weight = DeviceArray<float4>(m_num_marked);
 
         //find 4 nearest neighbours
-        device::findKNN<<<num,1,0,stream>>>(dist, knn_ind, VERTEX_NUM, m_knn);
-        device::calculate_weights<<<num,1,0,stream>>>(dist, m_knn, knn_ind,
+        device::findKNN<<<num,1,0,stream>>>(m_dist, knn_ind, VERTEX_NUM, m_knn);
+        device::calculate_weights<<<m_num_marked,1,0,stream>>>(m_dist, m_knn, knn_ind,
                 VERTEX_NUM, m_knn_weight);
     }
 }

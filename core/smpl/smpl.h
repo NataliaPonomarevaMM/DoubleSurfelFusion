@@ -25,8 +25,14 @@ namespace surfelwarp {
         DeviceArray<int64_t> m__kinematicTree; // Hierarchy relation between joints, the root is at the belly button, (2, 24).
 
         ///useful information to store
+        int m_vert_frame;
         DeviceArray<float> m_restShape;
         DeviceArray<float> m_smpl_vertices;
+        int m_dist_frame;
+        DeviceArray<float> m_dist;
+        int m_num_marked;
+        DeviceArray<bool> m_marked_vertices;
+        int m_knn_frame;
         DeviceArray<ushort4> m_knn;
         DeviceArray<float4> m_knn_weight;
         DeviceArray<int> m_onbody;
@@ -52,20 +58,26 @@ namespace surfelwarp {
         void skinning(
                 const DeviceArray<float> &transformation,
                 cudaStream_t stream);
+        void LbsModel(cudaStream_t stream);
+        void MarkVertices(
+                const DeviceArrayView<float4>& live_vertex,
+                cudaStream_t stream);
+        void CountKnn(
+                const DeviceArrayView<float4>& live_vertex,
+                const int frame_idx,
+                cudaStream_t stream);
     public:
         using Ptr = std::shared_ptr<SMPL>;
         SMPL();
         ~SMPL();
         SURFELWARP_NO_COPY_ASSIGN_MOVE(SMPL);
 
-        void LbsModel(cudaStream_t stream = 0);
         void Split(
+                const DeviceArrayView<float4>& live_vertex,
                 const DeviceArrayView<float4>& reference_vertex,
+                const int frame_idx,
                 DeviceArray<float4>& onbody_points,
                 DeviceArray<float4>& farbody_points,
-                cudaStream_t stream = 0);
-        void CountKnn(
-                const DeviceArrayView<float4>& reference_vertex,
                 cudaStream_t stream = 0);
 
         struct SolverInput {
@@ -74,7 +86,10 @@ namespace surfelwarp {
             DeviceArrayView<float4> knn_weight;
             DeviceArrayView<int> onbody;
         };
-        SolverInput SolverAccess() const;
+        SolverInput SolverAccess(
+                const DeviceArrayView<float4>& live_vertex,
+                const int frame_idx,
+                cudaStream_t stream = 0) const;
     };
 } // namespace smpl
 #endif // SMPL_H
