@@ -56,7 +56,8 @@ void surfelwarp::DenseDepthHandler::SetInputs(
 	const DeviceArrayView<DualQuaternion>& node_se3,
 	const DeviceArrayView2D<KNNAndWeight>& knn_map,
 	//smpl
-    const DeviceArrayView<float> smpl_vertices,
+    const DeviceArrayView<float3> smpl_vertices,
+    const DeviceArrayView<float3> smpl_normals,
     const DeviceArrayView<ushort4> smpl_knn,
     const DeviceArrayView<float4> smpl_knn_weight,
     const DeviceArrayView<int> onbody,
@@ -86,6 +87,7 @@ void surfelwarp::DenseDepthHandler::SetInputs(
 
     //smpl
     m_smpl_vertices = smpl_vertices;
+    m_smpl_normals = smpl_normals;
     m_smpl_knn = smpl_knn;
     m_smpl_knn_weight = smpl_knn_weight;
     m_onbody = onbody;

@@ -111,6 +111,7 @@ void surfelwarp::WarpSolver::setDenseDepthHandlerFullInput() {
 		node_se3,
 		m_knn_map,
         m_smpl_input.smpl_vertices,
+        m_smpl_input.smpl_normals,
         m_smpl_input.knn,
         m_smpl_input.knn_weight,
         m_smpl_input.onbody,

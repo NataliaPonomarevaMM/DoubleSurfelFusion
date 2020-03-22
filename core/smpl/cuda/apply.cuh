@@ -4,18 +4,25 @@
 namespace surfelwarp {
     namespace device {
         __host__ __device__ __forceinline__ float3 apply(
-                        const float* smpl_vertices,
+                        const float3* smpl_vertices,
                         const ushort4& knn,
                         const float4& knn_weight
         ) {
-            float coord[3];
-            for (int k = 0; k < 3; k++) {
-                coord[k] += smpl_vertices[knn.x * 3 + k] * knn_weight.x;
-                coord[k] += smpl_vertices[knn.y * 3 + k] * knn_weight.y;
-                coord[k] += smpl_vertices[knn.z * 3 + k] * knn_weight.z;
-                coord[k] += smpl_vertices[knn.w * 3 + k] * knn_weight.w;
-            }
-            return make_float3(coord[0], coord[1], coord[2]);
+            return smpl_vertices[knn.x] * knn_weight.x +
+                smpl_vertices[knn.y] * knn_weight.y +
+                smpl_vertices[knn.z] * knn_weight.z +
+                smpl_vertices[knn.w] * knn_weight.w;
+        }
+
+        __host__ __device__ __forceinline__ float3 apply_normal(
+                        const float3* smpl_normals,
+                        const ushort4& knn,
+                        const float4& knn_weight
+        ) {
+            return normalize(smpl_normals[knn.x] * knn_weight.x +
+                            smpl_normals[knn.y] * knn_weight.y +
+                            smpl_normals[knn.z] * knn_weight.z +
+                            smpl_normals[knn.w] * knn_weight.w);
         }
     }
 }

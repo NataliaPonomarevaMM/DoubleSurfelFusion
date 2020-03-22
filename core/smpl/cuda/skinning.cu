@@ -11,11 +11,11 @@ namespace surfelwarp {
                 const PtrSz<const float> transformation,
                 const PtrSz<const float> weights,
                 const int jointnum,
-                PtrSz<float> vertices
+                PtrSz<float3> vertices
         ) {
             int j = blockIdx.x;
 
-            if (j * 3 + 3 >= vertices.size)
+            if (j + 1 >= vertices.size)
                 return;
 
             float coeffs[16] = {0};
@@ -27,12 +27,15 @@ namespace surfelwarp {
             float homoW = coeffs[15];
             for (int t = 0; t < 3; t++)
                 homoW += coeffs[12 + t] * restShape[j * 3 + t];
+
+            float vert[3];
             for (int k = 0; k < 3; k++) {
-                vertices[j * 3 + k] = coeffs[k * 4 + 3];
+                vert[k] = coeffs[k * 4 + 3];
                 for (int t = 0; t < 3; t++)
-                    vertices[j * 3 + k] += coeffs[k * 4 + t] * restShape[j * 3 + t];
-                vertices[j * 3 + k] /= homoW;
+                    vert[k] += coeffs[k * 4 + t] * restShape[j * 3 + t];
+                vert[k] /= homoW;
             }
+            vertices[j] = make_float3(vert[0], vert[1], vert[2]);
         }
     }
 

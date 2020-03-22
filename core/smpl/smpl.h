@@ -23,12 +23,13 @@ namespace surfelwarp {
         DeviceArray<float> m__jointRegressor; // Joint coefficients of each vertices for regressing them to joint locations, (24, 6890).
         DeviceArray<float> m__weights; // Weights for linear blend skinning, (6890, 24).
         DeviceArray<int64_t> m__kinematicTree; // Hierarchy relation between joints, the root is at the belly button, (2, 24).
+        DeviceArray<int> m__faceIndices; // (13776, 3)
 
         ///useful information to store
         int m_vert_frame;
         DeviceArray<float> m_restShape;
-        DeviceArray<float> m_smpl_vertices;
-        int m_dist_frame;
+        DeviceArray<float3> m_smpl_vertices;
+        DeviceArray<float3> m_smpl_normals;
         DeviceArray<float> m_dist;
         int m_num_marked;
         DeviceArray<bool> m_marked_vertices;
@@ -58,11 +59,12 @@ namespace surfelwarp {
         void skinning(
                 const DeviceArray<float> &transformation,
                 cudaStream_t stream);
-        void LbsModel(cudaStream_t stream);
-        void MarkVertices(
+        void countNormals(cudaStream_t stream);
+        void lbsModel(cudaStream_t stream);
+        void markVertices(
                 const DeviceArrayView<float4>& live_vertex,
                 cudaStream_t stream);
-        void CountKnn(
+        void countKnn(
                 const DeviceArrayView<float4>& live_vertex,
                 const int frame_idx,
                 cudaStream_t stream);
@@ -81,7 +83,8 @@ namespace surfelwarp {
                 cudaStream_t stream = 0);
 
         struct SolverInput {
-            DeviceArrayView<float> smpl_vertices;
+            DeviceArrayView<float3> smpl_vertices;
+            DeviceArrayView<float3> smpl_normals;
             DeviceArrayView<ushort4> knn;
             DeviceArrayView<float4> knn_weight;
             DeviceArrayView<int> onbody;

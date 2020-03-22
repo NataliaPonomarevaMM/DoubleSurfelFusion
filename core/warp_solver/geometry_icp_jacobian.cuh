@@ -50,7 +50,7 @@ namespace surfelwarp { namespace device {
             const float4& depth_normal_radius,
             const ushort4& knn, const float4& knn_weight,
             //The warp field
-            const float* smpl_vertices,
+            const float3* smpl_vertices,
             const mat34& camera2world,
             //The output
             TwistGradientOfScalarCost& twist_graident,

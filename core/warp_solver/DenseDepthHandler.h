@@ -32,7 +32,8 @@ namespace surfelwarp {
 		mat34 m_camera2world;
 
 		//Info from smpl
-        DeviceArrayView<float> m_smpl_vertices;
+        DeviceArrayView<float3> m_smpl_vertices;
+        DeviceArrayView<float3> m_smpl_normals;
         DeviceArrayView<ushort4> m_smpl_knn;
         DeviceArrayView<float4> m_smpl_knn_weight;
         DeviceArrayView<int> m_onbody;
@@ -68,7 +69,8 @@ namespace surfelwarp {
 			const DeviceArrayView<DualQuaternion>& node_se3,
 			const DeviceArrayView2D<KNNAndWeight>& knn_map,
 			//smpl
-            const DeviceArrayView<float> smpl_vertices,
+            const DeviceArrayView<float3> smpl_vertices,
+            const DeviceArrayView<float3> smpl_normals,
             const DeviceArrayView<ushort4> smpl_knn,
             const DeviceArrayView<float4> smpl_knn_weight,
             const DeviceArrayView<int> onbody,

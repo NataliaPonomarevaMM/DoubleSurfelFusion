@@ -4,28 +4,24 @@
 #include "core/smpl/smpl.h"
 #include "common/common_types.h"
 #include "common/Constants.h"
+#include <device_launch_parameters.h>
 
 namespace surfelwarp {
     namespace device {
         __global__ void count_distance(
                 const DeviceArrayView<float4> reference_vertex,
-                const PtrSz<const float> restShape,
+                const PtrSz<const float3> smpl_vertices,
                 const int max_dist,
-                const int vertexnum,
                 PtrSz<float> dist,
                 PtrSz<bool> marked
         ) {
             int i = blockIdx.x; // reference vertex size
             if (i >= reference_vertex.Size())
                 return;
-            const float cur[3] = {reference_vertex[i].x, reference_vertex[i].y, reference_vertex[i].z};
 
+            vertexnum = smpl_vertices.size;
             for (int j = 0; j < vertexnum; j++) {
-                dist[i * vertexnum + j] = 0;
-                for (int k = 0; k < 3; k++) {
-                    float r = cur[k] - restShape[j * 3 + k];
-                    dist[i * vertexnum + j] += r * r;
-                }
+                dist[i * vertexnum + j] = length(reference_vertex[i] - smpl_vertices[j]);
                 if (dist[i * vertexnum + j] <= max_dist)
                     marked[i] = true;
             }
@@ -118,15 +114,15 @@ namespace surfelwarp {
         }
     }
 
-    void SMPL::MarkVertices(
+    void SMPL::markVertices(
             const DeviceArrayView<float4>& live_vertex,
             cudaStream_t stream
     ) {
         m_dist = DeviceArray<float>(live_vertex.Size() * VERTEX_NUM);
         m_marked_vertices = DeviceArray<bool>(live_vertex.Size());
 
-        device::count_distance<<<reference_vertex.Size(),1,0,stream>>>(live_vertex, m_restShape,
-                2.8f * Constants::kNodeRadius, VERTEX_NUM, m_dist, m_marked_vertices);
+        device::count_distance<<<reference_vertex.Size(),1,0,stream>>>(live_vertex, m_smpl_vertices,
+                2.8f * Constants::kNodeRadius, m_dist, m_marked_vertices);
         bool *host_array = (bool *)malloc(sizeof(bool) * m_marked_vertices.size());
         m_marked_vertices.download(host_array);
         m_num_marked = 0;
@@ -144,12 +140,9 @@ namespace surfelwarp {
             cudaStream_t stream
     ) {
         if (m_vert_frame != frame_idx) {
-            LbsModel(stream);
+            lbsModel(stream);
+            markVertices(live_vertex, stream);
             m_vert_frame = frame_idx;
-        }
-        if (m_dist_frame != frame_idx) {
-            MarkVertices(live_vertex, stream);
-            m_dist_frame = frame_idx;
         }
         onbody_points = DeviceArray<float4>(m_num_marked);
         farbody_points = DeviceArray<float4>(reference_vertex.Size() - m_num_marked);
@@ -157,18 +150,15 @@ namespace surfelwarp {
                 onbody_points, farbody_points);
     }
 
-    void SMPL::CountKnn(
+    void SMPL::countKnn(
             const DeviceArrayView<float4>& live_vertex,
             const int frame_idx,
             cudaStream_t stream
     ) {
         if (m_vert_frame != frame_idx) {
-            LbsModel(stream);
+            lbsModel(stream);
+            markVertices(live_vertex, stream);
             m_vert_frame = frame_idx;
-        }
-        if (m_dist_frame != frame_idx) {
-            MarkVertices(live_vertex, stream);
-            m_dist_frame = frame_idx;
         }
         auto knn_ind = DeviceArray<int>(m_num_marked);
         m_onbody = DeviceArray<int>(live_vertex.Size());

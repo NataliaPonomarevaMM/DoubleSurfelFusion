@@ -4,6 +4,7 @@
 #include "core/warp_solver/DenseDepthHandler.h"
 #include "core/warp_solver/solver_constants.h"
 #include "core/warp_solver/geometry_icp_jacobian.cuh"
+#include "core/smpl/cuda/apply.cuh"
 #include <device_launch_parameters.h>
 
 namespace surfelwarp { namespace device {
@@ -13,7 +14,7 @@ namespace surfelwarp { namespace device {
 		cudaTextureObject_t depth_normal_radius_map,
 		cudaTextureObject_t reference_vertex_map,
         cudaTextureObject_t index_map,
-        const float* smpl_vertices,
+        const float3* smpl_vertices,
         const ushort4* smpl_knn,
         const float4* smpl_knn_weight,
         const int* onbody,
@@ -82,6 +83,12 @@ namespace surfelwarp { namespace device {
 		cudaTextureObject_t depth_normal_radius_map,
 		cudaTextureObject_t reference_vertex_map,
 		cudaTextureObject_t reference_normal_map,
+        cudaTextureObject_t index_map,
+        const float3* smpl_vertices,
+        const float3* smpl_normals,
+        const ushort4* smpl_knn,
+        const float4* smpl_knn_weight,
+        const int* onbody,
 		unsigned img_rows, unsigned img_cols,
 		//The potential matched pixels and their knn
 		DeviceArrayView<ushort2> potential_matched_pixels,
@@ -105,18 +112,32 @@ namespace surfelwarp { namespace device {
 
 		//Now, query the pixel, knn and their weight
 		const ushort2 potential_pixel = potential_matched_pixels[idx];
-		const ushort4 knn = potential_matched_knn[idx];
-		const float4 knn_weight = potential_matched_knn_weight[idx];
 
 		//Get the vertex
 		const float4 can_vertex4 = tex2D<float4>(reference_vertex_map, potential_pixel.x, potential_pixel.y);
 		const float4 can_normal4 = tex2D<float4>(reference_normal_map, potential_pixel.x, potential_pixel.y);
-		DualQuaternion dq_average = averageDualQuaternion(node_se3, knn, knn_weight);
-		const mat34 se3 = dq_average.se3_matrix();
+        const auto reference_index = tex2D<unsigned>(index_map, pixel_pair.x, pixel_pair.y);
 
-		//And warp it
-		const float3 warped_vertex = se3.rot * can_vertex4 + se3.trans;
-		const float3 warped_normal = se3.rot * can_normal4;
+        //to fill
+        float3 warped_vertex, warped_normal;
+
+        if (onbody[reference_index] != -1) {
+            const int ind = onbody[reference_index];
+            // should warp smpl
+            const ushort4 knn = smpl_knn[ind];
+            const float4 knn_weight = smpl_knn_weight[ind];
+            //Warp it
+            warped_vertex = apply(smpl_vertices, knn, knn_weight);
+            warped_normal = apply_normal(smpl_normals, knn, knn_weight);
+        } else {
+            const ushort4 knn = potential_matched_knn[idx];
+            const float4 knn_weight = potential_matched_knn_weight[idx];
+            DualQuaternion dq_average = averageDualQuaternion(node_se3, knn, knn_weight);
+            const mat34 se3 = dq_average.se3_matrix();
+            //Warp it
+            warped_vertex = se3.rot * can_vertex4 + se3.trans;
+            warped_normal = se3.rot * can_normal4;
+        }
 
 		//Transfer to the camera frame
 		const float3 warped_vertex_camera = world2camera.rot * warped_vertex + world2camera.trans;
@@ -223,6 +244,12 @@ void surfelwarp::DenseDepthHandler::ComputeJacobianTermsFixedIndex(cudaStream_t 
 		m_depth_observation.normal_map,
 		m_geometry_maps.reference_vertex_map,
 		m_geometry_maps.reference_normal_map,
+        m_geometry_maps.index_map,
+        m_smpl_vertices.RawPtr(),
+        m_smpl_normals.RawPtr(),
+        m_smpl_knn.RawPtr(),
+        m_smpl_knn_weight.RawPtr(),
+        m_onbody.RawPtr(),
 		m_knn_map.Rows(), m_knn_map.Cols(),
 		//The pixel pairs and knn
 		m_potential_pixels_knn.pixels,
