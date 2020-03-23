@@ -118,10 +118,10 @@ namespace surfelwarp {
     SMPL::SolverInput SMPL::SolverAccess(
             const DeviceArrayView<float4>& live_vertex,
             const int frame_idx,
-            cudaStream_t stream) const
+            cudaStream_t stream)
     {
         if (m_knn_frame != frame_idx) {
-            countKnn(live_vertex, stream);
+            countKnn(live_vertex, frame_idx, stream);
             m_knn_frame = frame_idx;
         }
 
