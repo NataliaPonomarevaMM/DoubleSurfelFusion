@@ -187,9 +187,13 @@ namespace surfelwarp {
 	    static void DrawMatchedCloudPair(cudaTextureObject_t cloud_1,
 	                                     cudaTextureObject_t cloud_2,
 	                                     const Matrix4f& from1To2);
-	
-	
-	    static void SaveMatchedCloudPair(
+
+
+        static void SaveSMPLCloud(
+                const DeviceArray<float3> &smpl_vertices,
+                const std::string &cloud_name
+        );
+            static void SaveMatchedCloudPair(
 		    const PointCloud3f_Pointer& cloud_1,
 		    const PointCloud3f_Pointer& cloud_2,
 		    const std::string& cloud_1_name, const std::string& cloud_2_name

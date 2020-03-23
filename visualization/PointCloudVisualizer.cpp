@@ -412,6 +412,14 @@ void surfelwarp::Visualizer::DrawMatchedCloudPair(
     DrawMatchedCloudPair(h_cloud_1, h_cloud_2, from1To2);
 }
 
+void surfelwarp::Visualizer::SaveSMPLCloud(
+        const DeviceArray<float3> &smpl_vertices,
+        const std::string &cloud_name
+) {
+    const PointCloud3f_Pointer cloud = downloadPointCloud(smpl_vertices);
+    auto color_cloud_1 = addColorToPointCloud(cloud, make_uchar4(245, 0, 0, 255));
+    SaveColoredPointCloud(cloud, cloud_name);
+}
 
 void surfelwarp::Visualizer::SaveMatchedCloudPair(
         const PointCloud3f_Pointer &cloud_1,
