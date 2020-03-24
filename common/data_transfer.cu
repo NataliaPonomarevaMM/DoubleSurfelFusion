@@ -197,6 +197,17 @@ PointCloud3f_Pointer surfelwarp::downloadPointCloud(const surfelwarp::DeviceArra
 	return point_cloud;
 }
 
+PointCloud3f_Pointer surfelwarp::downloadPointCloud(const surfelwarp::DeviceArray<float3>& vertex) {
+    PointCloud3f_Pointer point_cloud(new PointCloud3f);
+    std::vector<float3> h_vertex;
+    vertex.download(h_vertex);
+    setPointCloudSize(point_cloud, vertex.size());
+    for (auto idx = 0; idx < vertex.size(); idx++) {
+        setPoint(h_vertex[idx].x, h_vertex[idx].y, h_vertex[idx].z, point_cloud, idx);
+    }
+    return point_cloud;
+}
+
 PointCloud3f_Pointer surfelwarp::downloadPointCloud(const DeviceArray2D<float4>& vertex_map) {
 	PointCloud3f_Pointer point_cloud(new PointCloud3f);
 	const auto num_rows = vertex_map.rows();

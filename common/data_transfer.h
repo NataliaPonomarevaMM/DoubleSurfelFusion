@@ -40,6 +40,7 @@ namespace surfelwarp
 	/* The point cloud download functions
 	 */
 	PointCloud3f_Pointer downloadPointCloud(const DeviceArray<float4>& vertex);
+    PointCloud3f_Pointer downloadPointCloud(const DeviceArray<float3>& vertex);
 	PointCloud3f_Pointer downloadPointCloud(const DeviceArray2D<float4>& vertex_map);
 	PointCloud3f_Pointer downloadPointCloud(const DeviceArray2D<float4>& vertex_map, DeviceArrayView<unsigned> indicator);
 	PointCloud3f_Pointer downloadPointCloud(const DeviceArray2D<float4>& vertex_map, DeviceArrayView<ushort2> pixel);
