@@ -8,7 +8,7 @@
 #include <assert.h>
 #include <Eigen/Eigen>
 #include <device_launch_parameters.h>
-
+#include <cilantro/point_cloud.hpp>
 
 cv::Mat surfelwarp::downloadDepthImage(const DeviceArray2D<unsigned short>& image_gpu) {
 	const auto num_rows = image_gpu.rows();
@@ -187,13 +187,17 @@ void surfelwarp::downloadTransferBinaryMeanfield(cudaTextureObject_t meanfield_q
 /* The point cloud downloading method
  */
 PointCloud3f_Pointer surfelwarp::downloadPointCloud(const surfelwarp::DeviceArray<float4>& vertex) {
-	PointCloud3f_Pointer point_cloud(new PointCloud3f);
+	std::vector<float> arr = {1,2,3};
+	auto d = cilantro::ConstVectorSetMatrixMap<float,3>(arr);
+	PointCloud3f_Pointer point_cloud(new PointCloud3f(d));
 	std::vector<float4> h_vertex;
 	vertex.download(h_vertex);
-	setPointCloudSize(point_cloud, vertex.size());
-	for (auto idx = 0; idx < vertex.size(); idx++) {
-		setPoint(h_vertex[idx].x, h_vertex[idx].y, h_vertex[idx].z, point_cloud, idx);
-	}
+	//    point_cloud->points.resize(3, 1);
+//	setPointCloudSize(point_cloud, vertex.size());
+//	for (auto idx = 0; idx < vertex.size(); idx++) {
+//		std::cout << h_vertex[idx].x;
+//		setPoint(h_vertex[idx].x, h_vertex[idx].y, h_vertex[idx].z, point_cloud, idx);
+//	}
 	return point_cloud;
 }
 

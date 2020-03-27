@@ -1,5 +1,5 @@
 #pragma once
-#include "common/common_types.h"
+#include "math/vector_ops.hpp"
 
 namespace surfelwarp {
     namespace device {
@@ -19,10 +19,11 @@ namespace surfelwarp {
                         const ushort4& knn,
                         const float4& knn_weight
         ) {
-            return normalize(smpl_normals[knn.x] * knn_weight.x +
+           float3 norm = smpl_normals[knn.x] * knn_weight.x +
                             smpl_normals[knn.y] * knn_weight.y +
                             smpl_normals[knn.z] * knn_weight.z +
-                            smpl_normals[knn.w] * knn_weight.w);
+                            smpl_normals[knn.w] * knn_weight.w;
+	   return normalized(norm);
         }
     }
 }

@@ -2,8 +2,8 @@
 #include <cmath>
 #include "core/smpl/def.h"
 #include "core/smpl/smpl.h"
-#include "common/common_types.h"
 #include "common/Constants.h"
+#include "math/vector_ops.hpp"
 #include <device_launch_parameters.h>
 
 namespace surfelwarp {
@@ -19,9 +19,10 @@ namespace surfelwarp {
             if (i >= reference_vertex.Size())
                 return;
 
-            vertexnum = smpl_vertices.size;
+            int vertexnum = smpl_vertices.size;
+	    float3 refv = make_float3(reference_vertex[i].x, reference_vertex[i].y, reference_vertex[i].z);
             for (int j = 0; j < vertexnum; j++) {
-                dist[i * vertexnum + j] = length(reference_vertex[i] - smpl_vertices[j]);
+                dist[i * vertexnum + j] = norm(refv - smpl_vertices[j]);
                 if (dist[i * vertexnum + j] <= max_dist)
                     marked[i] = true;
             }

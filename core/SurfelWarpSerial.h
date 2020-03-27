@@ -101,7 +101,12 @@ namespace surfelwarp {
 		void saveSolverMaps(const Renderer::SolverMaps& solver_maps, const boost::filesystem::path& save_dir);
 		
 		//Save the coorresponded geometry and obsertion
-		void saveCorrespondedCloud(const CameraObservation& observation, unsigned vao_idx, const boost::filesystem::path& save_dir);
+void saveCorrespondedCloud(
+	const CameraObservation &observation,
+	unsigned vao_idx,
+    const DeviceArray<float3> &smpl_vertices,
+	const boost::filesystem::path &save_dir
+);
 		
 		
 		//The rendered and shaded geometry, This method requires access to OpenGL pipeline

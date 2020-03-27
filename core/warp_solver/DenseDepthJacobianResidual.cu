@@ -116,7 +116,7 @@ namespace surfelwarp { namespace device {
 		//Get the vertex
 		const float4 can_vertex4 = tex2D<float4>(reference_vertex_map, potential_pixel.x, potential_pixel.y);
 		const float4 can_normal4 = tex2D<float4>(reference_normal_map, potential_pixel.x, potential_pixel.y);
-        const auto reference_index = tex2D<unsigned>(index_map, pixel_pair.x, pixel_pair.y);
+        const auto reference_index = tex2D<unsigned>(index_map, potential_pixel.x, potential_pixel.y);
 
         //to fill
         float3 warped_vertex, warped_normal;

@@ -2,6 +2,17 @@
 // Created by wei on 3/23/18.
 //
 
+#include "common/data_transfer.h"
+#include "common/common_utils.h"
+#include "common/encode_utils.h"
+#include "common/logging.h"
+#include "common/common_texture_utils.h"
+#include "common/common_point_cloud_utils.h"
+#include "math/vector_ops.hpp"
+#include <assert.h>
+#include <Eigen/Eigen>
+#include <device_launch_parameters.h>
+
 #include "common/Stream.h"
 #include "common/Serializer.h"
 #include "common/BinaryFileStream.h"
@@ -288,8 +299,8 @@ void surfelwarp::Visualizer::SaveColoredPointCloud(const PointCloud3fRGB_Pointer
     const auto &points = point_cloud->points;
 
     file_output << "COFF" << std::endl;
-    file_output << points.size() << " " << 0 << " " << 0 << std::endl;
-    for (auto i = 0; i < points.size(); i++) {
+    file_output << point_cloud->size() << " " << 0 << " " << 0 << std::endl;
+    for (auto i = 0; i < point_cloud->size(); i++) {
 #ifdef WITH_PCL
         const auto point = points[i];
         file_output << point.x
@@ -416,32 +427,52 @@ void surfelwarp::Visualizer::SaveSMPLCloud(
         const DeviceArray<float3> &smpl_vertices,
         const std::string &cloud_name
 ) {
-    const PointCloud3f_Pointer cloud = downloadPointCloud(smpl_vertices);
-    auto color_cloud_1 = addColorToPointCloud(cloud, make_uchar4(245, 0, 0, 255));
-    SaveColoredPointCloud(cloud, cloud_name);
+    std::vector<float3> h_cloud;
+    smpl_vertices.download(h_cloud);
+    SaveColoredPointCloud(h_cloud, make_uchar3(200, 200, 200), cloud_name);
 }
 
-void surfelwarp::Visualizer::SaveMatchedCloudPair(
-        const PointCloud3f_Pointer &cloud_1,
-        const PointCloud3f_Pointer &cloud_2,
-        const std::string &cloud_1_name, const std::string &cloud_2_name
-) {
-    auto color_cloud_1 = addColorToPointCloud(cloud_1, make_uchar4(245, 0, 0, 255));
-    auto color_cloud_2 = addColorToPointCloud(cloud_2, make_uchar4(200, 200, 200, 255));
-    SaveColoredPointCloud(color_cloud_1, cloud_1_name);
-    SaveColoredPointCloud(color_cloud_2, cloud_2_name);
+void surfelwarp::Visualizer::SaveColoredPointCloud(const std::vector<float3> points,
+                                                   const uchar3 color,
+                                                   const std::string &path) {
+    std::ofstream file_output;
+    file_output.open(path);
+
+    file_output << "COFF" << std::endl;
+    file_output << points.size() << " " << 0 << " " << 0 << std::endl;
+    for (auto i = 0; i < points.size(); i++) {
+        const auto point = points[i];
+        file_output << point.x
+                    << " " << point.y
+                    << " " << point.z
+                    << " " << color.x / 255.f
+                    << " " << color.y / 255.f
+                    << " " << color.z / 255.f
+                    << std::endl;
+    }
+    file_output.close();
 }
 
-void surfelwarp::Visualizer::SaveMatchedCloudPair(
-        const PointCloud3f_Pointer &cloud_1,
-        const PointCloud3f_Pointer &cloud_2,
-        const Eigen::Matrix4f &from1To2,
-        const std::string &cloud_1_name, const std::string &cloud_2_name
-) {
-    PointCloud3f_Pointer transformed_cloud_1 = transformPointCloud(cloud_1, from1To2);
-    SaveMatchedCloudPair(transformed_cloud_1, cloud_2, cloud_1_name, cloud_2_name);
-}
+void surfelwarp::Visualizer::SaveColoredPointCloud(const std::vector<float4> points,
+                                                   const uchar3 color,
+                                                   const std::string &path) {
+    std::ofstream file_output;
+    file_output.open(path);
 
+    file_output << "COFF" << std::endl;
+    file_output << points.size() << " " << 0 << " " << 0 << std::endl;
+    for (auto i = 0; i < points.size(); i++) {
+        const auto point = points[i];
+        file_output << point.x
+                    << " " << point.y
+                    << " " << point.z
+                    << " " << color.x / 255.f
+                    << " " << color.y / 255.f
+                    << " " << color.z / 255.f
+                    << std::endl;
+    }
+    file_output.close();
+}
 
 void surfelwarp::Visualizer::SaveMatchedCloudPair(
         cudaTextureObject_t cloud_1,
@@ -449,16 +480,34 @@ void surfelwarp::Visualizer::SaveMatchedCloudPair(
         const Eigen::Matrix4f &from1To2,
         const std::string &cloud_1_name, const std::string &cloud_2_name
 ) {
-    const auto h_cloud_1 = downloadPointCloud(cloud_1);
-    const auto h_cloud_2 = downloadPointCloud(cloud_2);
-    SaveMatchedCloudPair(
-            h_cloud_1,
-            h_cloud_2,
-            from1To2,
-            cloud_1_name, cloud_2_name
-    );
-}
+    std::vector<float4> h_cloud_2;
+    cloud_2.download(h_cloud_2);
 
+    unsigned rows, cols;
+    query2DTextureExtent(cloud_1, cols, rows);
+    DeviceArray2D<float4> vertex_map_array;
+    vertex_map_array.create(rows, cols);
+    textureToMap2D<float4>(cloud_1, vertex_map_array);
+    const auto total_size = cols * rows;
+    float4* h_cloud_1 = new float4[total_size];
+    vertex_map_array.download(h_cloud_1, cols * sizeof(float4));
+
+    std::vector<float3> trans_cloud_1;
+    for (auto i = 0; i < total_size; i++) {
+        float x = h_cloud_1[i].x * 0.001;
+        float y = h_cloud_1[i].y * 0.001;
+        float z = h_cloud_1[i].z * 0.001;
+        Eigen::Vector4f transed_point4(x, y, z, 1.0);
+        transed_point4 = from1To2 * transed_point4;
+        float3 transed_point;
+        transed_point.x = transed_point4(0) * 1000;
+        transed_point.y = transed_point4(1) * 1000;
+        transed_point.z = transed_point4(2) * 1000;
+        trans_cloud_1.push_back(transed_point);
+    }
+    SaveColoredPointCloud(trans_cloud_1, make_uchar3(245, 0, 0), cloud_1_name);
+    SaveColoredPointCloud(h_cloud_2, make_uchar3(200, 200, 200), cloud_2_name);
+}
 
 void surfelwarp::Visualizer::SaveMatchedCloudPair(
         cudaTextureObject_t cloud_1,
@@ -466,6 +515,7 @@ void surfelwarp::Visualizer::SaveMatchedCloudPair(
         const Eigen::Matrix4f &from1To2,
         const std::string &cloud_1_name, const std::string &cloud_2_name
 ) {
+	std::cout << "s1\n";
     SaveMatchedCloudPair(
             cloud_1,
             DeviceArray<float4>((float4 *) cloud_2.RawPtr(), cloud_2.Size()),

@@ -163,6 +163,7 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 	m_warp_solver->SolveStreamed();
 	const auto solved_se3 = m_warp_solver->SolvedNodeSE3();
 	
+
 	//Do a forward warp and build index
 	m_warp_field->UpdateHostDeviceNodeSE3NoSync(solved_se3);
 	SurfelNodeDeformer::ForwardWarpSurfelsAndNodes(*m_warp_field, *m_surfel_geometry[m_updated_geometry_index], solved_se3);
@@ -185,7 +186,7 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 	//Map both maps to surfelwarp as they are both required
 	m_renderer->MapSurfelGeometryToCuda(0);
 	m_renderer->MapSurfelGeometryToCuda(1);
-	
+
 	//The hand tune variable now. Should be replaced later
 	const bool use_reinit = shouldDoReinit();
 	const bool do_integrate = shouldDoIntegration();
@@ -211,8 +212,10 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 		//Process it
 		const auto node_error = m_warp_solver->GetNodeAlignmentError();
 		unsigned num_remaining_surfel, num_appended_surfel;
+
 		m_geometry_reinit_processor->ProcessReinitObservedOnlySerial(num_remaining_surfel, num_appended_surfel);
 		//m_geometry_reinit_processor->ProcessReinitNodeErrorSerial(num_remaining_surfel, num_appended_surfel, node_error, 0.06f);
+
 		
 		//Reinit the warp field
 		const auto reference_vertex = m_surfel_geometry[fused_geometry_idx]->ReferenceVertexConfidence();
@@ -221,6 +224,7 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
         m_smpl_model->Split(live_vertex, reference_vertex, m_frame_idx, onbody, farbody);
         m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(
                 DeviceArrayView<float4>(onbody), DeviceArrayView<float4>(farbody), m_warp_field);
+
 
 		//Build the index and skinning nodes and surfels
 		m_warp_field->BuildNodeGraph();
@@ -248,15 +252,12 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 			float(m_frame_idx),
 			m_camera.GetWorld2Camera()
 		);
-		
 		//Do fusion
 		unsigned num_remaining_surfel, num_appended_surfel;
 		//m_live_geometry_updater->ProcessFusionSerial(num_remaining_surfel, num_appended_surfel);
 		m_live_geometry_updater->ProcessFusionStreamed(num_remaining_surfel, num_appended_surfel);
-		
 		//Do a inverse warping
 		SurfelNodeDeformer::InverseWarpSurfels(*m_warp_field, *m_surfel_geometry[fused_geometry_idx], solved_se3);
-		
 		//Extend the warp field reference nodes and SE3
 		const auto prev_node_size = m_warp_field->CheckAndGetNodeSize();
 		const float4* appended_vertex_ptr = m_surfel_geometry[fused_geometry_idx]->ReferenceVertexConfidence().RawPtr() + num_remaining_surfel;
@@ -267,7 +268,6 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 		
 		//Rebuild the node graph
 		m_warp_field->BuildNodeGraph();
-		
 		//Update skinning
 		if(m_warp_field->CheckAndGetNodeSize() > prev_node_size){
 			m_reference_knn_skinner->UpdateBruteForceSkinningIndexWithNewNodes(m_warp_field->ReferenceNodeCoordinates().DeviceArrayReadOnly(), prev_node_size);
@@ -278,7 +278,6 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 			m_reference_knn_skinner->PerformSkinningUpdate(skinner_geometry, skinner_warpfield, prev_node_size);
 		}
 	}
-	
 	//Unmap attributes
 	m_renderer->UnmapFusionMapsFromCuda();
 	m_renderer->UnmapSurfelGeometryFromCuda(0);
@@ -286,6 +285,7 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 	
 	//Debug save
 	if(offline_save) {
+		std::cout << "7\n";
 		const auto with_recent = draw_recent || use_reinit;
 		const auto& save_dir = createOrGetDataDirectory(m_frame_idx);
 		saveCameraObservations(observation, save_dir);
@@ -334,7 +334,8 @@ void surfelwarp::SurfelWarpSerial::saveCorrespondedCloud(
 	const std::string cloud_1_name = (save_dir / "observation.off").string();
 	const std::string cloud_2_name = (save_dir / "model.off").string();
     const std::string smpl_cloud_name = (save_dir / "smpl.off").string();
-	
+
+
 	auto geometry = m_surfel_geometry[vao_idx]->Geometry();
 	Visualizer::SaveMatchedCloudPair(
 		observation.vertex_config_map,
@@ -345,7 +346,7 @@ void surfelwarp::SurfelWarpSerial::saveCorrespondedCloud(
     Visualizer::SaveSMPLCloud(smpl_vertices, smpl_cloud_name);
 	
 	//Also save the reference point cloud
-	Visualizer::SavePointCloud(geometry.reference_vertex_confid.ArrayView(), (save_dir / "reference.off").string());
+//	Visualizer::SavePointCloud(geometry.reference_vertex_confid.ArrayView(), (save_dir / "reference.off").string());
 }
 
 

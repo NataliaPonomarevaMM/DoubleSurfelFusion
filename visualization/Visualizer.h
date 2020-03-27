@@ -193,23 +193,20 @@ namespace surfelwarp {
                 const DeviceArray<float3> &smpl_vertices,
                 const std::string &cloud_name
         );
-            static void SaveMatchedCloudPair(
-		    const PointCloud3f_Pointer& cloud_1,
-		    const PointCloud3f_Pointer& cloud_2,
-		    const std::string& cloud_1_name, const std::string& cloud_2_name
-	    );
-	    static void SaveMatchedCloudPair(
-		    const PointCloud3f_Pointer & cloud_1,
-		    const PointCloud3f_Pointer & cloud_2,
-		    const Eigen::Matrix4f & from1To2,
-		    const std::string& cloud_1_name, const std::string& cloud_2_name
-	    );
-	    static void SaveMatchedCloudPair(
-		    cudaTextureObject_t cloud_1,
-		    const DeviceArray<float4>& cloud_2,
-		    const Matrix4f& from1To2,
-		    const std::string& cloud_1_name, const std::string& cloud_2_name
-	    );
+
+static void SaveMatchedCloudPair(
+        cudaTextureObject_t cloud_1,
+        const DeviceArray<float4> &cloud_2,
+        const Eigen::Matrix4f &from1To2,
+        const std::string &cloud_1_name, const std::string &cloud_2_name
+) ;
+static void SaveColoredPointCloud(const std::vector<float4> points,
+                                                   const uchar3 color,
+                                                   const std::string &path);
+
+static void SaveColoredPointCloud(const std::vector<float3> points,
+                                                   const uchar3 color,
+                                                   const std::string &path);
 	    static void SaveMatchedCloudPair(
 		    cudaTextureObject_t cloud_1,
 		    const DeviceArrayView<float4>& cloud_2,

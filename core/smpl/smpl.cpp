@@ -63,7 +63,7 @@ namespace surfelwarp {
     }
 
     SMPL::SMPL() {
-        moveModel();
+//        moveModel();
 
         std::string modelPath = "/home/nponomareva/DoubleFusion/data/smpl_female2.json";
         std::string hmrPath = "/home/nponomareva/data/hmr_results/hmr_data.json";
@@ -95,7 +95,7 @@ namespace surfelwarp {
         m__beta.upload(data_arr + 75, 10);
     }
 
-    void SMPL::LbsModel(cudaStream_t stream) {
+    void SMPL::lbsModel(cudaStream_t stream) {
 	    auto poseRotation = DeviceArray<float>(JOINT_NUM * 9);
         auto restPoseRotation = DeviceArray<float>(JOINT_NUM * 9);
         auto poseBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
@@ -104,7 +104,7 @@ namespace surfelwarp {
         auto globalTransformations = DeviceArray<float>(JOINT_NUM * 16);
 
         m_restShape = DeviceArray<float>(VERTEX_NUM * 3);
-        m_smpl_vertices = DeviceArray<float>(VERTEX_NUM);
+        m_smpl_vertices = DeviceArray<float3>(VERTEX_NUM);
 
         countPoseBlendShape(poseRotation, restPoseRotation, poseBlendShape, stream);
         countShapeBlendShape(shapeBlendShape, stream);
@@ -133,7 +133,7 @@ namespace surfelwarp {
         solver_input.onbody = m_onbody;
         return solver_input;
     }
-    DeviceArray<float3> GetVertices() const {
+    DeviceArray<float3> SMPL::GetVertices() const {
         return m_smpl_vertices;
     }
 } // namespace smpl

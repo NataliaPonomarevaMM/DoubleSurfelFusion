@@ -74,7 +74,8 @@ inline
 PointCloud3f_Pointer transformPointCloud(const PointCloud3f_Pointer& input, Eigen::Matrix4f transformation){
     PointCloud3f_Pointer transformed_cloud(new PointCloud3f());
     setPointCloudSize(transformed_cloud, input->size());
-    for (auto iPoint = 0; iPoint < input->points.size(); iPoint++) {
+	std::cout << input->size() << " " << input->points.cols() << " " << input->points.rows();
+    for (auto iPoint = 0; iPoint < input->size(); iPoint++) {
 #ifdef WITH_PCL
         auto &point = input->points[iPoint];
         float x = point.x * 0.001;
