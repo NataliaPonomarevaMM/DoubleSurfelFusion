@@ -191,6 +191,7 @@ namespace surfelwarp {
 
         static void SaveSMPLCloud(
                 const DeviceArray<float3> &smpl_vertices,
+                const DeviceArray<int> &face_ind,
                 const std::string &cloud_name
         );
 

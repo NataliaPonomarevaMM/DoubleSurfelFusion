@@ -92,7 +92,8 @@ namespace surfelwarp {
                 const DeviceArrayView<float4>& live_vertex,
                 const int frame_idx,
                 cudaStream_t stream = 0);
-        DeviceArray<float3> GetVertices() const;
+        DeviceArray<float3> GetVertices() const { return m_smpl_vertices; };
+        DeviceArray<int> GetFaceIndices() const { return m__faceIndices; };
     };
 } // namespace smpl
 #endif // SMPL_H

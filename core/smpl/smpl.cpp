@@ -133,7 +133,4 @@ namespace surfelwarp {
         solver_input.onbody = m_onbody;
         return solver_input;
     }
-    DeviceArray<float3> SMPL::GetVertices() const {
-        return m_smpl_vertices;
-    }
 } // namespace smpl

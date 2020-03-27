@@ -425,30 +425,28 @@ void surfelwarp::Visualizer::DrawMatchedCloudPair(
 
 void surfelwarp::Visualizer::SaveSMPLCloud(
         const DeviceArray<float3> &smpl_vertices,
+        const DeviceArray<int> &face_ind,
         const std::string &cloud_name
 ) {
     std::vector<float3> h_cloud;
     smpl_vertices.download(h_cloud);
-    SaveColoredPointCloud(h_cloud, make_uchar3(200, 200, 200), cloud_name);
-}
+    std::vector<int> h_face;
+    face_ind.download(h_face);
 
-void surfelwarp::Visualizer::SaveColoredPointCloud(const std::vector<float3> points,
-                                                   const uchar3 color,
-                                                   const std::string &path) {
     std::ofstream file_output;
-    file_output.open(path);
-
-    file_output << "COFF" << std::endl;
-    file_output << points.size() << " " << 0 << " " << 0 << std::endl;
-    for (auto i = 0; i < points.size(); i++) {
+    file_output.open(cloud_name);
+    for (auto i = 0; i < h_cloud.size(); i++) {
         const auto point = points[i];
-        file_output << point.x
-                    << " " << point.y
-                    << " " << point.z
-                    << " " << color.x / 255.f
-                    << " " << color.y / 255.f
-                    << " " << color.z / 255.f
-                    << std::endl;
+        file_output << 'v' << ' '
+                    << point.x << ' '
+                    << point.y << ' '
+                    << point.z << std::endl;
+    }
+    for (auto i = 0; i < h_face.size() / 3; i++) {
+        file_output << 'f' << ' '
+             << h_face[i * 3] << ' '
+             << h_face[i * 3 + 1] << ' '
+             << h_face[i * 3 + 2] << std::endl;
     }
     file_output.close();
 }

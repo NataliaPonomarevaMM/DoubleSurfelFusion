@@ -298,7 +298,8 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 			save_dir, with_recent
 		);
         saveCorrespondedCloud(observation, fused_geometry_idx,
-                              m_smpl_model->GetVertices(), save_dir);
+                              m_smpl_model->GetVertices(),
+                              m_smpl_model->GetFaceIndices() save_dir);
 	}
 	
 	//Update the index
@@ -329,11 +330,12 @@ void surfelwarp::SurfelWarpSerial::saveCorrespondedCloud(
 	const CameraObservation &observation,
 	unsigned vao_idx,
     const DeviceArray<float3> &smpl_vertices,
+    const DeviceArray<int> &face_ind,
 	const boost::filesystem::path &save_dir
 ) {
 	const std::string cloud_1_name = (save_dir / "observation.off").string();
 	const std::string cloud_2_name = (save_dir / "model.off").string();
-    const std::string smpl_cloud_name = (save_dir / "smpl.off").string();
+    const std::string smpl_cloud_name = (save_dir / "smpl.obj").string();
 
 
 	auto geometry = m_surfel_geometry[vao_idx]->Geometry();
@@ -343,7 +345,7 @@ void surfelwarp::SurfelWarpSerial::saveCorrespondedCloud(
 		m_camera.GetCamera2WorldEigen(),
 		cloud_1_name, cloud_2_name
 	);
-    Visualizer::SaveSMPLCloud(smpl_vertices, smpl_cloud_name);
+    Visualizer::SaveSMPLCloud(smpl_vertices, face_ind, smpl_cloud_name);
 	
 	//Also save the reference point cloud
 //	Visualizer::SavePointCloud(geometry.reference_vertex_confid.ArrayView(), (save_dir / "reference.off").string());
