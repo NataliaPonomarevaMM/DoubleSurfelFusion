@@ -71,7 +71,7 @@ void surfelwarp::NodeGraphSmoothHandler::SetInputs(
 
 /* The method to build the term2jacobian
  */
-void surfelwarp::NodeGraphSmoothHandler::forwardWarpSmootherNodes(cudaStream_t stream) {
+void surfelwarp::NodeGraphSmoothHandler::BuildTerm2Jacobian(cudaStream_t stream) {
 	Ti_xj_.ResizeArrayOrException(m_node_graph.Size());
 	Tj_xj_.ResizeArrayOrException(m_node_graph.Size());
 	m_pair_validity_indicator.ResizeArrayOrException(m_node_graph.Size());
@@ -91,10 +91,6 @@ void surfelwarp::NodeGraphSmoothHandler::forwardWarpSmootherNodes(cudaStream_t s
 	cudaSafeCall(cudaStreamSynchronize(stream));
 	cudaSafeCall(cudaGetLastError());
 #endif
-}
-
-void surfelwarp::NodeGraphSmoothHandler::BuildTerm2Jacobian(cudaStream_t stream) {
-	forwardWarpSmootherNodes(stream);
 }
 
 surfelwarp::NodeGraphSmoothTerm2Jacobian surfelwarp::NodeGraphSmoothHandler::Term2JacobianMap() const

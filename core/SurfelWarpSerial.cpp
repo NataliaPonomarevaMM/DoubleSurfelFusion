@@ -159,7 +159,6 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 	);
 	
 	//Solve it
-	//m_warp_solver->SolveSerial();
 	m_warp_solver->SolveStreamed();
 	const auto solved_se3 = m_warp_solver->SolvedNodeSE3();
 	

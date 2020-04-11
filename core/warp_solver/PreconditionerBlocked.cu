@@ -408,9 +408,6 @@ void surfelwarp::PreconditionerRhsBuilder::ComputeDiagonalBlocks(cudaStream_t st
 	cudaSafeCall(cudaStreamSynchronize(stream));
 	cudaSafeCall(cudaGetLastError());
 #endif
-	
-	//Sanity check
-	//diagonalPreconditionerSanityCheck();
 }
 
 void surfelwarp::PreconditionerRhsBuilder::ComputeDiagonalPreconditionerGlobalIteration(cudaStream_t stream) {

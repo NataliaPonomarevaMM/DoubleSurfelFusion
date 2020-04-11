@@ -39,7 +39,6 @@ namespace surfelwarp {
 		DeviceBufferArray<float3> Ti_xj_;
 		DeviceBufferArray<float3> Tj_xj_;
 		DeviceBufferArray<unsigned char> m_pair_validity_indicator;
-		void forwardWarpSmootherNodes(cudaStream_t stream = 0);
 	public:
 		void BuildTerm2Jacobian(cudaStream_t stream = 0);
 		NodeGraphSmoothTerm2Jacobian Term2JacobianMap() const;

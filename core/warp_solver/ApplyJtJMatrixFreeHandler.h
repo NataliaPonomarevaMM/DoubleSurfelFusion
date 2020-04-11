@@ -50,10 +50,6 @@ namespace surfelwarp {
 		size_t MatrixSize() const override { return 6 * (m_node2term_map.offset.Size() - 1); }
 		void ApplySpMV(DeviceArrayView<float> x, DeviceArraySlice<float> spmv_x, cudaStream_t stream) override;
 
-		//Method for sanity check, shoule be called after SetInputs
-		void TestApplyJtJ();
-
-
 		/* Compute JtJ using node2term index or directly using atomic operation
 		 */
 	public:
@@ -70,50 +66,6 @@ namespace surfelwarp {
 		void applyJacobianTranposeDot(DeviceArraySlice<float> jtj_dot_x, cudaStream_t stream);
 	public:
 		void ApplyJtJSeparate(DeviceArrayView<float> x, DeviceArraySlice<float> jtj_dot_x, cudaStream_t stream = 0);
-	
-
-
-		/* Methods to perform sanity check using Eigen
-		 */
-	private:
-		void appendScalarCostJacobianTriplet(
-			ScalarCostTerm2Jacobian& term2jacobian,
-			unsigned row_offset,
-			std::vector<Eigen::Triplet<float>>& jacobian_triplet,
-			float term_weight = 1.0f
-		);
-		void appendSmoothJacobianTriplet(std::vector<Eigen::Triplet<float>>& jacobian_triplet);
-		void appendFeatureJacobianTriplet(unsigned row_offset, std::vector<Eigen::Triplet<float>>& jacobian_triplet);
-		void applyJtJEigen(
-			const std::vector<float>& x,
-			unsigned num_scalar_terms,
-			const std::vector<Eigen::Triplet<float>>& jacobian_triplet,
-			std::vector<float>& jtj_x
-		);
-	public:
-		EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
-
-		/* Methods to apply JtJ x directly for sanity check
-		 */
-	private:
-		static void updateScalarJtJDotXDirect(
-			const std::vector<float>& x,
-			ScalarCostTerm2Jacobian& term2jacobian,
-			std::vector<float>& jtj_x,
-			float term_weight_square = 1.0f
-		);
-		void updateSmoothJtJDotXDirect(
-			const std::vector<float>& x,
-			std::vector<float>& jtj_x
-		);
-		void updateFeatureJtJDotXDirect(
-			const std::vector<float>& x,
-			std::vector<float>& jtj_x
-		);
-		
-		void applyJtJSanityCheck(DeviceArrayView<float> x, DeviceArrayView<float> jtj_dot_x);
-		void testHostJtJ();
 	};
 	
 }

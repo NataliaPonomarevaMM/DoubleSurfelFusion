@@ -27,19 +27,30 @@ void surfelwarp::WarpSolver::AllocateBuffer() {
 	m_knn_map.create(m_image_height, m_image_width);
 	
 	//The correspondence depth and albedo pixel pairs
-	allocateImageKNNFetcherBuffer();
-	allocateDenseDepthBuffer();
-	allocateDensityForegroundMapBuffer();
-	allocateSparseFeatureBuffer();
-	allocateSmoothTermHandlerBuffer();
-	allocateNode2TermIndexBuffer();
-	allocatePreconditionerRhsBuffer();
-	allocateResidualEvaluatorBuffer();
-	allocateJtJApplyBuffer();
+    m_image_knn_fetcher = std::make_shared<ImageTermKNNFetcher>();
+    m_dense_depth_handler = std::make_shared<DenseDepthHandler>();
+    m_dense_depth_handler->AllocateBuffer();
+    m_density_foreground_handler = std::make_shared<DensityForegroundMapHandler>();
+    m_density_foreground_handler->AllocateBuffer();
+    m_sparse_correspondence_handler = std::make_shared<SparseCorrespondenceHandler>();
+    m_sparse_correspondence_handler->AllocateBuffer();
+    m_graph_smooth_handler = std::make_shared<NodeGraphSmoothHandler>();
+    m_node2term_index = std::make_shared<Node2TermsIndex>();
+    m_node2term_index->AllocateBuffer();
 #if defined(USE_MATERIALIZED_JTJ)
-	allocateMaterializedJtJBuffer();
+    m_nodepair2term_index = std::make_shared<NodePair2TermsIndex>();
+	m_nodepair2term_index->AllocateBuffer();
 #endif
-	allocatePCGSolverBuffer();
+    m_preconditioner_rhs_builder = std::make_shared<PreconditionerRhsBuilder>();
+    m_preconditioner_rhs_builder->AllocateBuffer();
+    m_apply_jtj_handler = std::make_shared<ApplyJtJHandlerMatrixFree>();
+    m_apply_jtj_handler->AllocateBuffer();
+#if defined(USE_MATERIALIZED_JTJ)
+    m_jtj_materializer = std::make_shared<JtJMaterializer>();
+	m_jtj_materializer->AllocateBuffer();
+#endif
+    const auto max_matrix_size = 6 * Constants::kMaxNumNodes;
+    m_pcg_solver = std::make_shared<BlockPCG<6>>(max_matrix_size);
 	
 	//Init the stream for cuda
 	initSolverStream();
@@ -52,57 +63,61 @@ void surfelwarp::WarpSolver::ReleaseBuffer() {
 	releaseSolverStream();
 	
 	//Release the corresponded buffer
-	releaseImageKNNFetcherBuffer();
-	releaseDenseDepthBuffer();
-	releaseDensityForegroundMapBuffer();
-	releaseSparseFeatureBuffer();
-	releaseSmoothTermHandlerBuffer();
-	releaseNode2TermIndexBuffer();
-	releasePreconditionerRhsBuffer();
-	releaseResidualEvaluatorBuffer();
-	releaseJtJApplyBuffer();
+    m_dense_depth_handler->ReleaseBuffer();
+    m_density_foreground_handler->ReleaseBuffer();
+    m_sparse_correspondence_handler->ReleaseBuffer();
+    m_node2term_index->ReleaseBuffer();
 #if defined(USE_MATERIALIZED_JTJ)
-	releaseMaterializedJtJBuffer();
+    m_nodepair2term_index->ReleaseBuffer();
 #endif
-	releasePCGSolverBuffer();
+    m_preconditioner_rhs_builder->ReleaseBuffer();
+    m_apply_jtj_handler->ReleaseBuffer();
+#if defined(USE_MATERIALIZED_JTJ)
+    m_jtj_materializer->ReleaseBuffer();
+#endif
+}
+
+//The input interface
+void surfelwarp::WarpSolver::SetSolverInputs(
+        CameraObservation observation,
+        Renderer::SolverMaps rendered_maps,
+        SurfelGeometry::SolverInput geometry_input,
+        WarpField::SolverInput warpfield_input,
+        SMPL::SolverInput smpl_input,
+        const mat34 &world2camera
+) {
+    m_observation = observation;
+    m_rendered_maps = rendered_maps;
+    m_geometry_input = geometry_input;
+    m_warpfield_input = warpfield_input;
+    m_world2camera = world2camera;
+    m_smpl_input = smpl_input;
+
+    //The iteration data
+    m_iteration_data.SetWarpFieldInitialValue(warpfield_input.node_se3);
 }
 
 
-/* The buffer and method for dense image term
- */
-void surfelwarp::WarpSolver::allocateImageKNNFetcherBuffer() {
-	m_image_knn_fetcher = std::make_shared<ImageTermKNNFetcher>();
-}
-
-void surfelwarp::WarpSolver::releaseImageKNNFetcherBuffer() {
-}
-
-void surfelwarp::WarpSolver::FetchPotentialDenseImageTermPixelsFixedIndexSynced(cudaStream_t stream) {
-	//Hand in the input
-	m_image_knn_fetcher->SetInputs(m_knn_map, m_rendered_maps.index_map);
-	
-	//Do processing
-	m_image_knn_fetcher->MarkPotentialMatchedPixels(stream);
-	m_image_knn_fetcher->CompactPotentialValidPixels(stream);
-	m_image_knn_fetcher->SyncQueryCompactedPotentialPixelSize(stream);
-	
-	//The sanity check: seems correct
-	//Call this after dense depth handler
-	//const auto& dense_depth_knn = m_dense_depth_handler->DenseDepthTermsKNNArray();
-	//m_image_knn_fetcher->CheckDenseImageTermKNN(dense_depth_knn);
+void surfelwarp::WarpSolver::SetSolverInputs(
+        CameraObservation observation,
+        Renderer::SolverMaps rendered_maps,
+        SurfelGeometry::SolverInput geometry_input,
+        WarpField::SolverInput warpfield_input,
+        SMPL::SolverInput smpl_input,
+        const Matrix4f& world2camera
+) {
+    SetSolverInputs(
+            observation,
+            rendered_maps,
+            geometry_input,
+            warpfield_input,
+            smpl_input,
+            mat34(world2camera)
+    );
 }
 
 /* The buffer and method for correspondence finder
  */
-void surfelwarp::WarpSolver::allocateDenseDepthBuffer() {
-	m_dense_depth_handler = std::make_shared<DenseDepthHandler>();
-	m_dense_depth_handler->AllocateBuffer();
-}
-
-void surfelwarp::WarpSolver::releaseDenseDepthBuffer() {
-	m_dense_depth_handler->ReleaseBuffer();
-}
-
 void surfelwarp::WarpSolver::setDenseDepthHandlerFullInput() {
 	const auto node_se3 = m_iteration_data.CurrentWarpFieldInput();
 	
@@ -123,11 +138,6 @@ void surfelwarp::WarpSolver::setDenseDepthHandlerFullInput() {
 		m_world2camera,
 		m_image_knn_fetcher->GetImageTermPixelAndKNN()
 	);
-}
-
-void surfelwarp::WarpSolver::FindCorrespondDepthPixelPairsFreeIndex(cudaStream_t stream) {
-	setDenseDepthHandlerFullInput();
-	m_dense_depth_handler->FindCorrespondenceSynced(stream);
 }
 
 void surfelwarp::WarpSolver::ComputeAlignmentErrorMapDirect(cudaStream_t stream) {
@@ -165,15 +175,6 @@ void surfelwarp::WarpSolver::ComputeAlignmentErrorMapFromNode(cudaStream_t strea
 
 /* The buffer and method for density and foreground mask pixel finder
  */
-void surfelwarp::WarpSolver::allocateDensityForegroundMapBuffer() {
-	m_density_foreground_handler = std::make_shared<DensityForegroundMapHandler>();
-	m_density_foreground_handler->AllocateBuffer();
-}
-
-void surfelwarp::WarpSolver::releaseDensityForegroundMapBuffer() {
-	m_density_foreground_handler->ReleaseBuffer();
-}
-
 void surfelwarp::WarpSolver::setDensityForegroundHandlerFullInput() {
 	//The current node se3 from iteraion data
 	const auto node_se3 = m_iteration_data.CurrentWarpFieldInput();
@@ -214,35 +215,8 @@ void surfelwarp::WarpSolver::setDensityForegroundHandlerFullInput() {
 #endif
 }
 
-void surfelwarp::WarpSolver::FindValidColorForegroundMaskPixel(cudaStream_t color_stream, cudaStream_t mask_stream)
-{
-	//Provide to input
-	setDensityForegroundHandlerFullInput();
-	
-	//Do it
-	m_density_foreground_handler->FindValidColorForegroundMaskPixels(color_stream, mask_stream);
-}
-
-void surfelwarp::WarpSolver::FindPotentialForegroundMaskPixelSynced(cudaStream_t stream) {
-	//Provide to input
-	setDensityForegroundHandlerFullInput();
-
-	//Do it
-	m_density_foreground_handler->FindPotentialForegroundMaskPixelSynced(stream);
-}
-
-
 /* The method to filter the sparse feature term
  */
-void surfelwarp::WarpSolver::allocateSparseFeatureBuffer() {
-	m_sparse_correspondence_handler = std::make_shared<SparseCorrespondenceHandler>();
-	m_sparse_correspondence_handler->AllocateBuffer();
-}
-
-void surfelwarp::WarpSolver::releaseSparseFeatureBuffer() {
-	m_sparse_correspondence_handler->ReleaseBuffer();
-}
-
 void surfelwarp::WarpSolver::SetSparseFeatureHandlerFullInput() {
 	//The current node se3 from iteraion data
 	const auto node_se3 = m_iteration_data.CurrentWarpFieldInput();
@@ -258,21 +232,8 @@ void surfelwarp::WarpSolver::SetSparseFeatureHandlerFullInput() {
 	);
 }
 
-void surfelwarp::WarpSolver::SelectValidSparseFeatureMatchedPairs(cudaStream_t stream) {
-	SetSparseFeatureHandlerFullInput();
-	m_sparse_correspondence_handler->BuildCorrespondVertexKNN(stream);
-}
-
 /* The method for smooth term handler
  */
-void surfelwarp::WarpSolver::allocateSmoothTermHandlerBuffer() {
-	m_graph_smooth_handler = std::make_shared<NodeGraphSmoothHandler>();
-}
-
-void surfelwarp::WarpSolver::releaseSmoothTermHandlerBuffer() {
-
-}
-
 void surfelwarp::WarpSolver::computeSmoothTermNode2Jacobian(cudaStream_t stream) {
 	//Prepare the input
 	m_graph_smooth_handler->SetInputs(
@@ -287,22 +248,6 @@ void surfelwarp::WarpSolver::computeSmoothTermNode2Jacobian(cudaStream_t stream)
 
 /* The index from node to term index
  */
-void surfelwarp::WarpSolver::allocateNode2TermIndexBuffer() {
-	m_node2term_index = std::make_shared<Node2TermsIndex>();
-	m_node2term_index->AllocateBuffer();
-#if defined(USE_MATERIALIZED_JTJ)
-	m_nodepair2term_index = std::make_shared<NodePair2TermsIndex>();
-	m_nodepair2term_index->AllocateBuffer();
-#endif
-}
-
-void surfelwarp::WarpSolver::releaseNode2TermIndexBuffer() {
-	m_node2term_index->ReleaseBuffer();
-#if defined(USE_MATERIALIZED_JTJ)
-	m_nodepair2term_index->ReleaseBuffer();
-#endif
-}
-
 void surfelwarp::WarpSolver::SetNode2TermIndexInput() {
 	const auto dense_depth_knn = m_image_knn_fetcher->DenseImageTermKNNArray();
 	//const auto density_map_knn = m_image_knn_fetcher->DenseImageTermKNNArray();
@@ -330,26 +275,12 @@ void surfelwarp::WarpSolver::SetNode2TermIndexInput() {
 #endif
 }
 
-void surfelwarp::WarpSolver::BuildNode2TermIndex(cudaStream_t stream) {
-	m_node2term_index->BuildIndex(stream);
-}
-
 void surfelwarp::WarpSolver::BuildNodePair2TermIndexBlocked(cudaStream_t stream) {
 	m_nodepair2term_index->BuildHalfIndex(stream);
 	m_nodepair2term_index->QueryValidNodePairSize(stream); //This will blocked
 	
 	//The later computation depends on the size
 	m_nodepair2term_index->BuildSymmetricAndRowBlocksIndex(stream);
-	
-	
-	//Do a sanity check
-	//m_nodepair2term_index->CheckHalfIndex();
-	//m_nodepair2term_index->CompactedIndexSanityCheck();
-	//m_nodepair2term_index->IndexStatistics();
-	
-	//Do a statistic on the smooth term: cannot do this
-	//The non-image terms are curcial to solver stability
-	//m_nodepair2term_index->CheckSmoothTermIndexCompleteness();
 }
 
 /* Prepare the jacobian for later use
@@ -379,37 +310,25 @@ void surfelwarp::WarpSolver::ComputeTermJacobianFixedIndex(
 
 /* Compute the preconditioner and linear equation rhs for later use
  */
-void surfelwarp::WarpSolver::allocatePreconditionerRhsBuffer() {
-	m_preconditioner_rhs_builder = std::make_shared<PreconditionerRhsBuilder>();
-	m_preconditioner_rhs_builder->AllocateBuffer();
-}
-
-void surfelwarp::WarpSolver::releasePreconditionerRhsBuffer() {
-	m_preconditioner_rhs_builder->ReleaseBuffer();
-}
-
 void surfelwarp::WarpSolver::SetPreconditionerBuilderAndJtJApplierInput() {
-	//Map from node to term
+    //Map from node to term
 	const auto node2term = m_node2term_index->GetNode2TermMap();
-	
+    //Map from nodepair to term
+    const auto nodepair2term = m_nodepair2term_index->GetNodePair2TermMap();
 	//The dense depth term
 	const auto dense_depth_term2jacobian = m_dense_depth_handler->Term2JacobianMap();
-	
 	//The node graph term
 	const auto smooth_term2jacobian = m_graph_smooth_handler->Term2JacobianMap();
-	
 	//The image map term
 	DensityMapTerm2Jacobian density_term2jacobian;
 	ForegroundMaskTerm2Jacobian foreground_term2jacobian;
 	m_density_foreground_handler->Term2JacobianMaps(density_term2jacobian, foreground_term2jacobian);
-	
 	//The sparse feature term
 	const auto feature_term2jacobian = m_sparse_correspondence_handler->Term2JacobianMap();
-	
 	//The penalty constants
 	const auto penalty_constants = m_iteration_data.CurrentPenaltyConstants();
-	
-	//Hand in the input to preconditioner builder
+
+    //Hand in the input to preconditioner builder
 	m_preconditioner_rhs_builder->SetInputs(
 		node2term,
 		dense_depth_term2jacobian,
@@ -419,18 +338,6 @@ void surfelwarp::WarpSolver::SetPreconditionerBuilderAndJtJApplierInput() {
 		feature_term2jacobian,
 		penalty_constants
 	);
-	
-	//Hand in to residual evaluator
-	m_residual_evaluator->SetInputs(
-		node2term,
-		dense_depth_term2jacobian,
-		smooth_term2jacobian,
-		density_term2jacobian,
-		foreground_term2jacobian,
-		feature_term2jacobian,
-		penalty_constants
-	);
-
 	//Hand in the input to jtj applier
 	m_apply_jtj_handler->SetInputs(
 		node2term,
@@ -441,111 +348,18 @@ void surfelwarp::WarpSolver::SetPreconditionerBuilderAndJtJApplierInput() {
 		feature_term2jacobian,
 		penalty_constants
 	);
-}
 
-void surfelwarp::WarpSolver::BuildPreconditioner(cudaStream_t stream) {
-	m_preconditioner_rhs_builder->ComputeDiagonalPreconditioner(stream);
-}
-
-void surfelwarp::WarpSolver::BuildPreconditionerGlobalIteration(cudaStream_t stream) {
-	m_preconditioner_rhs_builder->ComputeDiagonalPreconditionerGlobalIteration(stream);
-}
-
-//The method to compute jt residual
-void surfelwarp::WarpSolver::ComputeJtResidual(cudaStream_t stream) {
-	m_preconditioner_rhs_builder->ComputeJtResidual(stream);
-}
-
-void surfelwarp::WarpSolver::ComputeJtResidualGlobalIteration(cudaStream_t stream) {
-	m_preconditioner_rhs_builder->ComputeJtResidualGlobalIteration(stream);
-}
-
-
-
-/* The method to materialized the JtJ matrix
- */
-void surfelwarp::WarpSolver::allocateMaterializedJtJBuffer() {
-	m_jtj_materializer = std::make_shared<JtJMaterializer>();
-	m_jtj_materializer->AllocateBuffer();
-}
-
-void surfelwarp::WarpSolver::releaseMaterializedJtJBuffer() {
-	m_jtj_materializer->ReleaseBuffer();
-}
-
-void surfelwarp::WarpSolver::SetJtJMaterializerInput() {
-	//Map from node to term
-	const auto node2term = m_node2term_index->GetNode2TermMap();
-	
-	//Map from nodepair to term
-	const auto nodepair2term = m_nodepair2term_index->GetNodePair2TermMap();
-	
-	//The dense depth term
-	const auto dense_depth_term2jacobian = m_dense_depth_handler->Term2JacobianMap();
-	
-	//The node graph term
-	const auto smooth_term2jacobian = m_graph_smooth_handler->Term2JacobianMap();
-	
-	//The image map term
-	DensityMapTerm2Jacobian density_term2jacobian;
-	ForegroundMaskTerm2Jacobian foreground_term2jacobian;
-	m_density_foreground_handler->Term2JacobianMaps(density_term2jacobian, foreground_term2jacobian);
-	
-	//The sparse feature term
-	const auto feature_term2jacobian = m_sparse_correspondence_handler->Term2JacobianMap();
-	
-	//The penalty constants
-	const auto penalty_constants = m_iteration_data.CurrentPenaltyConstants();
-	
-	//Hand in to materializer
-	m_jtj_materializer->SetInputs(
-		nodepair2term,
-		dense_depth_term2jacobian,
-		smooth_term2jacobian,
-		density_term2jacobian,
-		foreground_term2jacobian,
-		feature_term2jacobian,
-		node2term,
-		penalty_constants
-	);
-}
-
-void surfelwarp::WarpSolver::MaterializeJtJNondiagonalBlocks(cudaStream_t stream) {
-	m_jtj_materializer->BuildMaterializedJtJNondiagonalBlocks(stream);
-}
-
-void surfelwarp::WarpSolver::MaterializeJtJNondiagonalBlocksGlobalIteration(cudaStream_t stream) {
-	m_jtj_materializer->BuildMaterializedJtJNondiagonalBlocksGlobalIteration(stream);
-}
-
-
-/* The method to apply JtJ to a given vector
- */
-void surfelwarp::WarpSolver::allocateJtJApplyBuffer()
-{
-	m_apply_jtj_handler = std::make_shared<ApplyJtJHandlerMatrixFree>();
-	m_apply_jtj_handler->AllocateBuffer();
-}
-
-void surfelwarp::WarpSolver::releaseJtJApplyBuffer()
-{
-	m_apply_jtj_handler->ReleaseBuffer();
-}
-
-
-/* The method to compute residual
- */
-void surfelwarp::WarpSolver::allocateResidualEvaluatorBuffer() {
-	m_residual_evaluator = std::make_shared<ResidualEvaluator>();
-	m_residual_evaluator->AllocateBuffer();
-}
-
-void surfelwarp::WarpSolver::releaseResidualEvaluatorBuffer() {
-	m_residual_evaluator->ReleaseBuffer();
-}
-
-float surfelwarp::WarpSolver::ComputeTotalResidualSynced(cudaStream_t stream) {
-	return m_residual_evaluator->ComputeTotalResidualSynced(stream);
+    //Hand in to materializer
+    m_jtj_materializer->SetInputs(
+            nodepair2term,
+            dense_depth_term2jacobian,
+            smooth_term2jacobian,
+            density_term2jacobian,
+            foreground_term2jacobian,
+            feature_term2jacobian,
+            node2term,
+            penalty_constants
+    );
 }
 
 

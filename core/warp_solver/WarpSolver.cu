@@ -31,8 +31,6 @@ namespace surfelwarp { namespace device {
 } // namespace device
 } // namespace surfelwarp
 
-
-
 void surfelwarp::WarpSolver::QueryPixelKNN(cudaStream_t stream) {
 	dim3 blk(16, 16);
 	dim3 grid(divUp(m_knn_map.cols(), blk.x), divUp(m_knn_map.rows(), blk.y));
@@ -53,18 +51,6 @@ void surfelwarp::WarpSolver::QueryPixelKNN(cudaStream_t stream) {
 
 /* The method to setup and solve Ax=b using pcg solver
  */
-void surfelwarp::WarpSolver::allocatePCGSolverBuffer() {
-	const auto max_matrix_size = 6 * Constants::kMaxNumNodes;
-	m_pcg_solver = std::make_shared<BlockPCG<6>>(max_matrix_size);
-}
-
-void surfelwarp::WarpSolver::releasePCGSolverBuffer() {
-}
-
-void surfelwarp::WarpSolver::UpdatePCGSolverStream(cudaStream_t stream) {
-	m_pcg_solver->UpdateCudaStream(stream);
-}
-
 void surfelwarp::WarpSolver::SolvePCGMatrixFree() {
 	//Prepare the data
 	const auto inversed_diagonal_preconditioner = m_preconditioner_rhs_builder->InversedPreconditioner();

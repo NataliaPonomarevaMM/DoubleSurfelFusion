@@ -53,16 +53,6 @@ namespace surfelwarp {
 		 */
 	private:
 		DeviceBufferArray<float> m_block_preconditioner;
-		
-		//Methods for sanity check
-		void updateScalarCostJtJDiagonalHost(std::vector<float>& jtj_flatten,
-		                                     ScalarCostTerm2Jacobian term2jacobian,
-		                                     float term_weight_square = 1.0f
-		);
-		void updateSmoothJtJDiagonalHost(std::vector<float>& jtj_flatten);
-		void updateFeatureJtJDiagonalHost(std::vector<float>& jtj_flatten);
-		void diagonalPreconditionerSanityCheck();
-		
 		//The actual processing methods
 	public:
 		void ComputeDiagonalBlocks(cudaStream_t stream = 0);
@@ -74,18 +64,10 @@ namespace surfelwarp {
 		BlockDiagonalPreconditionerInverse<6>::Ptr m_preconditioner_inverse_handler;
 	public:
 		void ComputeDiagonalPreconditionerInverse(cudaStream_t stream = 0);
-		
-		
 		/* The buffer and method to compute Jt.dot(Residual)
 		 */
 	private:
 		DeviceBufferArray<float> m_jt_residual;
-		
-		//Methods for sanity check
-		void updateScalarCostJtResidualHost(std::vector<float>& jt_residual, ScalarCostTerm2Jacobian term2jacobian, float term_weight_square = 1.0f);
-		void updateSmoothJtResidualHost(std::vector<float>& jt_residual);
-		void updateFeatureJtResidualHost(std::vector<float>& jt_residual);
-		void jacobianTransposeResidualSanityCheck();
 
 		//Compute with or without index
 		void ComputeJtResidualAtomic(cudaStream_t stream = 0);

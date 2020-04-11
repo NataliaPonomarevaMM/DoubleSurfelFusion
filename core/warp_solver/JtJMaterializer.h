@@ -65,10 +65,6 @@ namespace surfelwarp {
 		 */
 	private:
 		DeviceBufferArray<float> m_nondiag_blks;
-		void updateScalarCostJtJBlockHost(std::vector<float>& jtj_flatten, ScalarCostTerm2Jacobian term2jacobian, const float term_weight_square = 1.0f);
-		void updateSmoothCostJtJBlockHost(std::vector<float>& jtj_flatten);
-		void updateFeatureCostJtJBlockHost(std::vector<float>& jtj_flatten);
-		void nonDiagonalBlocksSanityCheck();
 	public:
 		void computeNonDiagonalBlocks(cudaStream_t stream = 0);
 		void computeNonDiagonalBlocksNoSync(cudaStream_t stream = 0);
@@ -82,11 +78,6 @@ namespace surfelwarp {
 	public:
 		void AssembleBinBlockCSR(DeviceArrayView<float> diagonal_blks, cudaStream_t stream = 0);
 		ApplySpMVBinBlockCSR<6>::Ptr GetSpMVHandler() { return m_spmv_handler; }
-		
-		/* The debug method for sparse matrix vector product
-		 */
-	public:
-		void TestSparseMV(DeviceArrayView<float> x, DeviceArrayView<float> jtj_x_result);
 	};
 	
 }

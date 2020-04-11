@@ -8,12 +8,12 @@ void surfelwarp::WarpSolver::initSolverStream() {
 	cudaSafeCall(cudaStreamCreate(&m_solver_stream[3]));
 	
 	//Hand in the stream to pcg solver
-	UpdatePCGSolverStream(m_solver_stream[0]);
+    m_pcg_solver->UpdateCudaStream(m_solver_stream[0]);
 }
 
 void surfelwarp::WarpSolver::releaseSolverStream() {
 	//Update 0 stream to pcg solver
-	UpdatePCGSolverStream(0);
+    m_pcg_solver->UpdateCudaStream(0);
 
 	cudaSafeCall(cudaStreamDestroy(m_solver_stream[0]));
 	cudaSafeCall(cudaStreamDestroy(m_solver_stream[1]));
@@ -58,19 +58,15 @@ void surfelwarp::WarpSolver::buildSolverIndexStreamed() {
 	m_image_knn_fetcher->SetInputs(m_knn_map, m_rendered_maps.index_map);
 	m_image_knn_fetcher->MarkPotentialMatchedPixels(m_solver_stream[0]);
 	m_image_knn_fetcher->CompactPotentialValidPixels(m_solver_stream[0]);
-	//m_image_knn_fetcher->SyncQueryCompactedPotentialPixelSize();
 
 	//FindPotentialForegroundMaskPixelSynced();
 	setDensityForegroundHandlerFullInput();
 	m_density_foreground_handler->MarkValidColorForegroundMaskPixels(m_solver_stream[1]);
 	m_density_foreground_handler->CompactValidMaskPixel(m_solver_stream[1]);
-	//m_density_foreground_handler->QueryCompactedMaskPixelArraySize();
 
-	//SelectValidSparseFeatureMatchedPairs();
 	SetSparseFeatureHandlerFullInput();
 	m_sparse_correspondence_handler->ChooseValidPixelPairs(m_solver_stream[2]);
 	m_sparse_correspondence_handler->CompactQueryPixelPairs(m_solver_stream[2]);
-	//m_sparse_correspondence_handler->QueryCompactedArraySize();
 
 	//The sync group
 	m_image_knn_fetcher->SyncQueryCompactedPotentialPixelSize(m_solver_stream[0]); //Sync is inside the method
@@ -81,7 +77,7 @@ void surfelwarp::WarpSolver::buildSolverIndexStreamed() {
 
 	//Before the index part: A sync happened here
 	SetNode2TermIndexInput();
-	BuildNode2TermIndex(m_solver_stream[0]); //This doesnt block
+    m_node2term_index->BuildIndex(m_solver_stream[0]); //This doesnt block
 	BuildNodePair2TermIndexBlocked(m_solver_stream[1]); //This will block
 	cudaSafeCall(cudaStreamSynchronize(m_solver_stream[0]));
 }
@@ -103,9 +99,9 @@ void surfelwarp::WarpSolver::solverIterationGlobalIterationStreamed() {
 	//The computation of diagonal blks JtJ and JtError
 	SetPreconditionerBuilderAndJtJApplierInput();
 	SetJtJMaterializerInput();
-	BuildPreconditionerGlobalIteration(m_solver_stream[0]);
-	ComputeJtResidualGlobalIteration(m_solver_stream[1]);
-	MaterializeJtJNondiagonalBlocksGlobalIteration(m_solver_stream[2]);
+    m_preconditioner_rhs_builder->ComputeDiagonalPreconditionerGlobalIteration(m_solver_stream[0]);
+    m_preconditioner_rhs_builder->ComputeJtResidualGlobalIteration(m_solver_stream[1]);
+    m_jtj_materializer->BuildMaterializedJtJNondiagonalBlocksGlobalIteration(m_solver_stream[2]);
 	cudaSafeCall(cudaStreamSynchronize(m_solver_stream[0]));
 	cudaSafeCall(cudaStreamSynchronize(m_solver_stream[1]));
 	cudaSafeCall(cudaStreamSynchronize(m_solver_stream[2]));
@@ -113,9 +109,6 @@ void surfelwarp::WarpSolver::solverIterationGlobalIterationStreamed() {
 	//The assemble of matrix: a sync here
 	const auto diagonal_blks = m_preconditioner_rhs_builder->JtJDiagonalBlocks();
 	m_jtj_materializer->AssembleBinBlockCSR(diagonal_blks, m_solver_stream[0]);
-
-	//Debug methods
-	//LOG(INFO) << "The total squared residual in materialized, fixed-index solver is " << ComputeTotalResidualSynced(m_solver_stream[0]);
 
 	//Solve it and update
 	SolvePCGMaterialized();
@@ -139,20 +132,16 @@ void surfelwarp::WarpSolver::solverIterationLocalIterationStreamed() {
 	//The computation of diagonal blks JtJ and JtError
 	SetPreconditionerBuilderAndJtJApplierInput();
 	SetJtJMaterializerInput();
-	BuildPreconditioner(m_solver_stream[0]);
-	ComputeJtResidual(m_solver_stream[1]);
-	MaterializeJtJNondiagonalBlocks(m_solver_stream[2]);
+    m_preconditioner_rhs_builder->ComputeDiagonalPreconditioner(m_solver_stream[0]);
+    m_preconditioner_rhs_builder->ComputeJtResidual(m_solver_stream[1]);
+    m_jtj_materializer->BuildMaterializedJtJNondiagonalBlocks(m_solver_stream[2]);
 	cudaSafeCall(cudaStreamSynchronize(m_solver_stream[0]));
 	cudaSafeCall(cudaStreamSynchronize(m_solver_stream[1]));
 	cudaSafeCall(cudaStreamSynchronize(m_solver_stream[2]));
-	
 
 	//The assemble of matrix: a sync here
 	const auto diagonal_blks = m_preconditioner_rhs_builder->JtJDiagonalBlocks();
 	m_jtj_materializer->AssembleBinBlockCSR(diagonal_blks, m_solver_stream[0]);
-
-	//Debug methods
-	//LOG(INFO) << "The total squared residual in materialized, fixed-index solver is " << ComputeTotalResidualSynced(m_solver_stream[0]);
 
 	//Solve it and update
 	SolvePCGMaterialized();
