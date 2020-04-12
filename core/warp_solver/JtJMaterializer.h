@@ -67,8 +67,6 @@ namespace surfelwarp {
 		DeviceBufferArray<float> m_nondiag_blks;
 	public:
 		void computeNonDiagonalBlocks(cudaStream_t stream = 0);
-		void computeNonDiagonalBlocksNoSync(cudaStream_t stream = 0);
-		
 		
 		/* The method to assemble Bin-Blocked csr matrix
 		 */
