@@ -326,7 +326,7 @@ namespace surfelwarp { namespace device {
 
 
 //Compute the Jt.dot(residual) using the index from node to term
-void surfelwarp::PreconditionerRhsBuilder::ComputeJtResidualIndexed(cudaStream_t stream)
+void surfelwarp::PreconditionerRhsBuilder::ComputeJtResidual(cudaStream_t stream)
 {
 	const auto num_nodes = m_node2term_map.offset.Size() - 1;
 	m_jt_residual.ResizeArrayOrException(num_nodes * device::jt_dot_blk_size);
@@ -338,6 +338,10 @@ void surfelwarp::PreconditionerRhsBuilder::ComputeJtResidualIndexed(cudaStream_t
 		m_jt_residual.Ptr(),
 		m_penalty_constants
 	);
+#if defined(CUDA_DEBUG_SYNC_CHECK)
+    cudaSafeCall(cudaStreamSynchronize(stream));
+	cudaSafeCall(cudaGetLastError());
+#endif
 }
 
 
@@ -353,17 +357,6 @@ void surfelwarp::PreconditionerRhsBuilder::ComputeJtResidualGlobalIteration(cuda
 		m_jt_residual.Ptr(),
 		m_penalty_constants
 	);
-	
-	//Sync and check error
-#if defined(CUDA_DEBUG_SYNC_CHECK)
-	cudaSafeCall(cudaStreamSynchronize(stream));
-	cudaSafeCall(cudaGetLastError());
-#endif
-}
-
-
-void surfelwarp::PreconditionerRhsBuilder::ComputeJtResidualLocalIteration(cudaStream_t stream) {
-	ComputeJtResidualIndexed(stream);
 	
 	//Sync and check error
 #if defined(CUDA_DEBUG_SYNC_CHECK)

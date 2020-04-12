@@ -298,7 +298,7 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 		);
         saveCorrespondedCloud(observation, fused_geometry_idx,
                               m_smpl_model->GetVertices(),
-                              m_smpl_model->GetFaceIndices() save_dir);
+                              m_smpl_model->GetFaceIndices(), save_dir);
 	}
 	
 	//Update the index

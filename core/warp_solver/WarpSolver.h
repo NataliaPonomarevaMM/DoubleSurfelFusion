@@ -21,7 +21,6 @@
 #include "core/warp_solver/Node2TermsIndex.h"
 #include "core/warp_solver/NodePair2TermsIndex.h"
 #include "core/warp_solver/PreconditionerRhsBuilder.h"
-#include "core/warp_solver/ResidualEvaluator.h"
 #include "core/warp_solver/JtJMaterializer.h"
 #include "core/warp_solver/ApplyJtJMatrixFreeHandler.h"
 #include "core/warp_solver/NodeGraphSmoothHandler.h"
@@ -147,7 +146,6 @@ namespace surfelwarp {
 
 		/* The pcg solver*/
 		BlockPCG<6>::Ptr m_pcg_solver;
-		void SolvePCGMatrixFree();
 		void SolvePCGMaterialized(int pcg_iterations = 10);
 
 		/* The solver interface for streamed solver*/

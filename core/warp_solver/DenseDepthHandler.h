@@ -69,11 +69,11 @@ namespace surfelwarp {
 			const DeviceArrayView<DualQuaternion>& node_se3,
 			const DeviceArrayView2D<KNNAndWeight>& knn_map,
 			//smpl
-            const DeviceArrayView<float3> smpl_vertices,
-            const DeviceArrayView<float3> smpl_normals,
-            const DeviceArrayView<ushort4> smpl_knn,
-            const DeviceArrayView<float4> smpl_knn_weight,
-            const DeviceArrayView<int> onbody,
+            const DeviceArrayView<float3> &smpl_vertices,
+            const DeviceArrayView<float3> &smpl_normals,
+            const DeviceArrayView<ushort4> &smpl_knn,
+            const DeviceArrayView<float4> &smpl_knn_weight,
+            const DeviceArrayView<int> &onbody,
 			cudaTextureObject_t depth_vertex_map, cudaTextureObject_t depth_normal_map,
 			//The rendered maps
 			cudaTextureObject_t reference_vertex_map,
@@ -86,9 +86,6 @@ namespace surfelwarp {
 		
 		//Update the se3
 		void UpdateNodeSE3(DeviceArrayView<DualQuaternion> node_se3);
-		
-		//The processing interface for free-index solver
-		void FindCorrespondenceSynced(cudaStream_t stream = 0);
 	private:
 		//These two should be 2D maps, flatten as the compaction is required
 		DeviceArray<ushort2> m_pixel_pair_maps; //The matched depth pixel pairs, used in index free version
@@ -107,7 +104,6 @@ namespace surfelwarp {
 		DeviceBufferArray<float4> m_dense_depth_knn_weight;
 	private:
 		void CompactMatchedPixelPairs(cudaStream_t stream = 0);
-		void compactedPairSanityCheck(DeviceArrayView<ushort4> surfel_knn_array);
 	public:
 		void SyncQueryCompactedArraySize(cudaStream_t stream = 0);
 		

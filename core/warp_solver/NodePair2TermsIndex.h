@@ -65,7 +65,6 @@ namespace surfelwarp {
 		struct {
 			DeviceArrayView<ushort4> dense_image_knn; //Each depth scalar term has 4 nearest neighbour
 			DeviceArrayView<ushort2> node_graph;
-			//DeviceArrayView<ushort4> density_map_knn; //Each density scalar term has 4 nearest neighbour
 			DeviceArrayView<ushort4> foreground_mask_knn; //The same as density term
 			DeviceArrayView<ushort4> sparse_feature_knn; //Each 4 nodes correspond to 3 scalar cost
 		} m_term2node;
@@ -139,27 +138,5 @@ namespace surfelwarp {
 	public:
 		void nullifyBinBlockCSRColumePtr(cudaStream_t stream = 0);
 		void computeBinBlockCSRColumnPtr(cudaStream_t stream = 0);
-		
-		
-		
-		/* Perform sanity check for nodepair2term
-		 */
-	public:
-		void CheckHalfIndex();
-		void CompactedIndexSanityCheck();
-		
-		//Check the size and distribution of the size of index
-		void IndexStatistics();
-		
-		//Check whether the smooth term contains nearly all index
-		//that can be exploited to implement more efficient indexing
-		//Required download data and should not be used in real-time code
-		void CheckSmoothTermIndexCompleteness();
-	private:
-		static void check4NNTermIndex(int typed_term_idx,
-		                       const std::vector<ushort4> &knn_vec,
-		                       unsigned encoded_nodepair);
-		static void checkSmoothTermIndex(int smooth_term_idx, const std::vector<ushort2>& node_graph, unsigned encoded_nodepair);
 	};
-	
 }

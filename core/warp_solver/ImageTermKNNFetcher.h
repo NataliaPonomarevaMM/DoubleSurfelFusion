@@ -83,10 +83,6 @@ namespace surfelwarp {
 			return output;
 		}
 		DeviceArrayView<ushort4> DenseImageTermKNNArray() const { return m_dense_image_knn.ArrayView(); }
-		
-		
-		//Sanity check
-		void CheckDenseImageTermKNN(const DeviceArrayView<ushort4>& dense_depth_knn_gpu);
 	};
 	
 	

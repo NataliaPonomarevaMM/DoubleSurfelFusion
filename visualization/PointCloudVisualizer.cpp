@@ -436,7 +436,7 @@ void surfelwarp::Visualizer::SaveSMPLCloud(
     std::ofstream file_output;
     file_output.open(cloud_name);
     for (auto i = 0; i < h_cloud.size(); i++) {
-        const auto point = points[i];
+        const auto point = h_cloud[i];
         file_output << 'v' << ' '
                     << point.x << ' '
                     << point.y << ' '

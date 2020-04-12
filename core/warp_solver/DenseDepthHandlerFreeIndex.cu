@@ -7,7 +7,8 @@
 #include "DenseDepthHandler.h"
 #include <device_launch_parameters.h>
 
-namespace surfelwarp { namespace device {
+namespace surfelwarp {
+    namespace device {
 
 	__global__ void markMatchedGeometryPixelPairsKernel(
 		cudaTextureObject_t depth_vertex_confid_map,
@@ -100,32 +101,6 @@ namespace surfelwarp { namespace device {
 		}
 	}
 
-
-	__global__ void markPotentialMatchedDepthPairKernel(
-		cudaTextureObject_t index_map,
-		unsigned img_rows, unsigned img_cols,
-		unsigned* reference_pixel_matched_indicator
-	) {
-		const auto x = threadIdx.x + blockDim.x*blockIdx.x;
-		const auto y = threadIdx.y + blockDim.y*blockIdx.y;
-		if (x >= img_cols || y >= img_rows) return;
-
-		//The indicator will must be written to pixel_occupied_array
-		const auto offset = y * img_cols + x;
-
-		//Read the value on index map
-		const auto surfel_index = tex2D<unsigned>(index_map, x, y);
-
-		//Need other criterion?
-		unsigned indicator = 0;
-		if(surfel_index != d_invalid_index) {
-			indicator = 1;
-		}
-		
-		reference_pixel_matched_indicator[offset] = indicator;
-	}
-
-	
 	__global__ void compactMatchedPixelPairsKernel(
 		const DeviceArrayView2D<KNNAndWeight> knn_map,
 		const unsigned* reference_pixel_matched_indicator,
@@ -150,30 +125,6 @@ namespace surfelwarp { namespace device {
 			valid_pixel_pairs_knn_weight[offset] = knn.weight;
 		}
 	}
-
-	__global__ void compactPontentialMatchedPixelPairsKernel(
-		const DeviceArrayView2D<KNNAndWeight> knn_map,
-		const unsigned* reference_pixel_matched_indicator,
-		const unsigned* prefixsum_matched_indicator,
-		ushort2* potential_matched_pixels,
-		ushort4* potential_matched_knn,
-		float4*  potential_matched_knn_weight
-	) {
-		const auto x = threadIdx.x + blockDim.x * blockIdx.x;
-		const auto y = threadIdx.y + blockDim.y * blockIdx.y;
-		if(x >= knn_map.Cols() || y >= knn_map.Rows()) return;
-		const auto flatten_idx = x + y * knn_map.Cols();
-		if(reference_pixel_matched_indicator[flatten_idx] > 0)
-		{
-			const auto offset = prefixsum_matched_indicator[flatten_idx] - 1;
-			const KNNAndWeight knn = knn_map(y, x);
-			potential_matched_pixels[offset] = make_ushort2(x, y);
-			potential_matched_knn[offset] = knn.knn;
-			potential_matched_knn_weight[offset] = knn.weight;
-		}
-
-	}
-
 } // namespace device
 } // namespace surfelwarp
 

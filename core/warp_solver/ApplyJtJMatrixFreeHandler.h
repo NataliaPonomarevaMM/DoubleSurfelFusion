@@ -23,7 +23,6 @@ namespace surfelwarp {
 		
 		//The penalty constants
 		PenaltyConstants m_penalty_constants;
-	
 	public:
 		using Ptr = std::shared_ptr<ApplyJtJHandlerMatrixFree>;
 		SURFELWARP_DEFAULT_CONSTRUCT_DESTRUCT(ApplyJtJHandlerMatrixFree);
@@ -50,22 +49,10 @@ namespace surfelwarp {
 		size_t MatrixSize() const override { return 6 * (m_node2term_map.offset.Size() - 1); }
 		void ApplySpMV(DeviceArrayView<float> x, DeviceArraySlice<float> spmv_x, cudaStream_t stream) override;
 
-		/* Compute JtJ using node2term index or directly using atomic operation
-		 */
-	public:
-		void ApplyJtJIndexed(DeviceArrayView<float> x, DeviceArraySlice<float> jtj_dot_x, cudaStream_t stream = 0);
-		void ApplyJtJAtomic(DeviceArrayView<float> x, DeviceArraySlice<float> jtj_dot_x, cudaStream_t stream = 0);
-		
-
-		/* First apply Jacobian, then apply Jt
-		 */
+		/* First apply Jacobian, then apply Jt*/
 	private:
-		const static unsigned kMaxNumScalarResidualTerms;
+		const static unsigned kMaxNumScalarResidualTerms = 300000;
 		DeviceBufferArray<float> m_jacobian_dot_x;
-		void applyJacobianDot(DeviceArrayView<float> x, cudaStream_t stream = 0);
-		void applyJacobianTranposeDot(DeviceArraySlice<float> jtj_dot_x, cudaStream_t stream);
-	public:
-		void ApplyJtJSeparate(DeviceArrayView<float> x, DeviceArraySlice<float> jtj_dot_x, cudaStream_t stream = 0);
 	};
 	
 }

@@ -69,13 +69,9 @@ namespace surfelwarp {
 	private:
 		DeviceBufferArray<float> m_jt_residual;
 
-		//Compute with or without index
-		void ComputeJtResidualAtomic(cudaStream_t stream = 0);
-		void ComputeJtResidualIndexed(cudaStream_t stream = 0);
 	public:
 		void ComputeJtResidual(cudaStream_t stream = 0);
 		void ComputeJtResidualGlobalIteration(cudaStream_t stream = 0);
-		void ComputeJtResidualLocalIteration(cudaStream_t stream = 0);
 		DeviceArrayView<float> JtDotResidualValue() const { return m_jt_residual.ArrayView(); }
 	};
 	

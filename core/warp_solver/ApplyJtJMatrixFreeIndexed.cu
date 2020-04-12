@@ -111,65 +111,6 @@ namespace surfelwarp { namespace device {
 		}
 	}
 
-
-	__device__ __forceinline__ void computeSmoothJtJDotXOnline(
-		const float* x,
-		const NodeGraphSmoothTerm2Jacobian& term2jacobian,
-		unsigned node_idx, unsigned typed_term,
-		float jtj_dot_x[jtj_dot_blk_size]
-	) {
-		const ushort2 node_ij = term2jacobian.node_graph[typed_term];
-		const auto xi = term2jacobian.reference_node_coords[node_ij.x];
-		const auto xj = term2jacobian.reference_node_coords[node_ij.y];
-		DualQuaternion dq_i = term2jacobian.node_se3[node_ij.x];
-		DualQuaternion dq_j = term2jacobian.node_se3[node_ij.y];
-		const mat34 Ti = dq_i.se3_matrix();
-		const mat34 Tj = dq_j.se3_matrix();
-		const auto validity = term2jacobian.validity_indicator[typed_term];
-		TwistGradientOfScalarCost twist_gradient_i[3];
-		TwistGradientOfScalarCost twist_gradient_j[3];
-		if(validity == 0) {
-#pragma unroll
-			for(auto i = 0; i < jtj_dot_blk_size; i++)
-				jtj_dot_x[i] = 0.0f;
-			return;
-		}
-		computeSmoothTermJacobian(xj, Ti, Tj, twist_gradient_i, twist_gradient_j);
-
-		//Make it flatten
-		const unsigned short* node_ij_arr = (const unsigned short*)(&node_ij);
-		const bool is_node_i = (node_idx == node_ij.x);
-		const float* jacobian = is_node_i ? (const float*)(twist_gradient_i) : (const float*)(twist_gradient_j);
-
-		//Compute the accumlate dot value
-		float accumlate_dot[3] = {0};
-		for(auto k = 0; k < 2; k++) {
-			const auto node_load_from = node_ij_arr[k];
-			const float* x_blk_k = x + (node_load_from * 6);
-			if(k == 0)
-			{
-				accumlate_dot[0] += twist_gradient_i[0].dot(x_blk_k);
-				accumlate_dot[1] += twist_gradient_i[1].dot(x_blk_k);
-				accumlate_dot[2] += twist_gradient_i[2].dot(x_blk_k);
-			}
-			else
-			{
-				accumlate_dot[0] += twist_gradient_j[0].dot(x_blk_k);
-				accumlate_dot[1] += twist_gradient_j[1].dot(x_blk_k);
-				accumlate_dot[2] += twist_gradient_j[2].dot(x_blk_k);
-			}
-		}
-		
-		//Assign to output
-#pragma unroll
-		for(auto k = 0; k < jtj_dot_blk_size; k++) {
-			jtj_dot_x[k] =   accumlate_dot[0] * jacobian[k]
-			               + accumlate_dot[1] * jacobian[6 + k]
-			               + accumlate_dot[2] * jacobian[12 + k];
-		}
-	}
-
-
 	__device__ __forceinline__ void computeFeatureTermJtJDotX(
 		const float* x,
 		const Point2PointICPTerm2Jacobian& term2jacobian,
@@ -275,13 +216,6 @@ namespace surfelwarp { namespace device {
 						fillJtJDotXToSharedBlock(term_jtj_dot_x, shared_blks, constants.SmoothSquared());
 					}
 					break;
-				/*case TermType::DensityMap:
-					{
-						float term_jtj_dot_x[jtj_dot_blk_size] = {0};
-						computeScalarJtJDotX(x, term2jacobian.density_map_term, node_idx, typed_term_idx, term_jtj_dot_x);
-						fillJtJDotXToSharedBlock(term_jtj_dot_x, shared_blks, constants.DensitySquared());
-					}
-					break;*/
 				case TermType::Foreground:
 					{
 						float term_jtj_dot_x[jtj_dot_blk_size] = {0};
@@ -328,7 +262,7 @@ namespace surfelwarp { namespace device {
 } // namespace surfelwarp
 
 
-void surfelwarp::ApplyJtJHandlerMatrixFree::ApplyJtJIndexed(DeviceArrayView<float> x, DeviceArraySlice<float> jtj_dot_x, cudaStream_t stream)
+void surfelwarp::ApplyJtJHandlerMatrixFree::ApplyJtJ(DeviceArrayView<float> x, DeviceArraySlice<float> jtj_dot_x, cudaStream_t stream)
 {
 	//simple sanity check
 	SURFELWARP_CHECK_EQ(x.Size(), jtj_dot_x.Size());
@@ -345,4 +279,8 @@ void surfelwarp::ApplyJtJHandlerMatrixFree::ApplyJtJIndexed(DeviceArrayView<floa
 		jtj_dot_x.RawPtr(),
 		m_penalty_constants
 	);
+#if defined(CUDA_DEBUG_SYNC_CHECK)
+    cudaSafeCall(cudaStreamSynchronize(stream));
+	cudaSafeCall(cudaGetLastError());
+#endif
 }

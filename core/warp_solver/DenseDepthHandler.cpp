@@ -56,11 +56,11 @@ void surfelwarp::DenseDepthHandler::SetInputs(
 	const DeviceArrayView<DualQuaternion>& node_se3,
 	const DeviceArrayView2D<KNNAndWeight>& knn_map,
 	//smpl
-    const DeviceArrayView<float3> smpl_vertices,
-    const DeviceArrayView<float3> smpl_normals,
-    const DeviceArrayView<ushort4> smpl_knn,
-    const DeviceArrayView<float4> smpl_knn_weight,
-    const DeviceArrayView<int> onbody,
+    const DeviceArrayView<float3> &smpl_vertices,
+    const DeviceArrayView<float3> &smpl_normals,
+    const DeviceArrayView<ushort4> &smpl_knn,
+    const DeviceArrayView<float4> &smpl_knn_weight,
+    const DeviceArrayView<int> &onbody,
 	cudaTextureObject_t depth_vertex_map, cudaTextureObject_t depth_normal_map,
 	//The rendered maps
 	cudaTextureObject_t reference_vertex_map,
@@ -97,57 +97,3 @@ void surfelwarp::DenseDepthHandler::UpdateNodeSE3(surfelwarp::DeviceArrayView<su
 	SURFELWARP_CHECK_EQ(node_se3.Size(), m_node_se3.Size());
 	m_node_se3 = node_se3;
 }
-
-void surfelwarp::DenseDepthHandler::FindCorrespondenceSynced(cudaStream_t stream) {
-	MarkMatchedPixelPairs(stream);
-	CompactMatchedPixelPairs(stream);
-	SyncQueryCompactedArraySize(stream);
-}
-
-void surfelwarp::DenseDepthHandler::compactedPairSanityCheck(DeviceArrayView<ushort4> surfel_knn_array)
-{
-	LOG(INFO) << "Check of compacted pair sanity";
-
-	SURFELWARP_CHECK_EQ(m_dense_depth_knn_weight.ArraySize(), m_valid_pixel_pairs.ArraySize());
-	SURFELWARP_CHECK_EQ(m_dense_depth_knn.ArraySize(), m_valid_pixel_pairs.ArraySize());
-
-	//Query the index maps
-	DeviceArray<unsigned> queried_index_array;
-	queried_index_array.create(m_valid_pixel_pairs.ArraySize());
-	queryIndexMapFromPixels(m_geometry_maps.index_map, m_valid_pixel_pairs.ArrayReadOnly(), queried_index_array);
-	
-	//Download the index
-	std::vector<unsigned> h_queried_index;
-	queried_index_array.download(h_queried_index);
-
-	//Download the knn array and compacted_knn array
-	std::vector<ushort4> h_surfel_knn_array, h_compacted_knn_array;
-	surfel_knn_array.Download(h_surfel_knn_array);
-	m_dense_depth_knn.ArrayReadOnly().Download(h_compacted_knn_array);
-
-	//Check it
-	for(auto i = 0; i < m_dense_depth_knn.ArraySize(); i++)
-	{
-		ushort4 compacted_knn = h_compacted_knn_array[i];
-		auto index = h_queried_index[i];
-		SURFELWARP_CHECK_NE(index, 0xFFFFFFFF);
-		SURFELWARP_CHECK(index < h_surfel_knn_array.size());
-		ushort4 original_knn = h_surfel_knn_array[index];
-		SURFELWARP_CHECK_EQ(compacted_knn.x, original_knn.x);
-		SURFELWARP_CHECK_EQ(compacted_knn.y, original_knn.y);
-		SURFELWARP_CHECK_EQ(compacted_knn.z, original_knn.z);
-		SURFELWARP_CHECK_EQ(compacted_knn.w, original_knn.w);
-	}
-
-	LOG(INFO) << "Seems correct";
-}
-
-
-
-
-
-
-
-
-
-

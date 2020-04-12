@@ -40,32 +40,3 @@ void surfelwarp::ImageTermKNNFetcher::SetInputs(
 	m_geometry_maps.index_map = index_map;
 }
 
-
-//Methods for sanity check
-void surfelwarp::ImageTermKNNFetcher::CheckDenseImageTermKNN(const surfelwarp::DeviceArrayView<ushort4> &dense_depth_knn_gpu) {
-	LOG(INFO) << "Check the image term knn against dense depth knn";
-	
-	//Should be called after sync
-	SURFELWARP_CHECK_EQ(m_dense_image_knn.ArraySize(), m_potential_pixels.ArraySize());
-	SURFELWARP_CHECK_EQ(m_dense_image_knn.ArraySize(), m_dense_image_knn_weight.ArraySize());
-	SURFELWARP_CHECK_EQ(m_dense_image_knn.ArraySize(), dense_depth_knn_gpu.Size());
-	
-	//Download the data
-	std::vector<ushort4> potential_pixel_knn_array, dense_depth_knn_array;
-	dense_depth_knn_gpu.Download(dense_depth_knn_array);
-	m_dense_image_knn.ArrayReadOnly().Download(potential_pixel_knn_array);
-	
-	//Iterates
-	for(auto i = 0; i < dense_depth_knn_array.size(); i++) {
-		const auto& pixel_knn = potential_pixel_knn_array[i];
-		const auto& depth_knn = dense_depth_knn_array[i];
-		SURFELWARP_CHECK(pixel_knn.x == depth_knn.x);
-		SURFELWARP_CHECK(pixel_knn.y == depth_knn.y);
-		SURFELWARP_CHECK(pixel_knn.z == depth_knn.z);
-		SURFELWARP_CHECK(pixel_knn.w == depth_knn.w);
-	}
-	
-	//Seems correct
-	LOG(INFO) << "Check done! Seems correct!";
-}
-

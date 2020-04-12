@@ -51,23 +51,6 @@ void surfelwarp::WarpSolver::QueryPixelKNN(cudaStream_t stream) {
 
 /* The method to setup and solve Ax=b using pcg solver
  */
-void surfelwarp::WarpSolver::SolvePCGMatrixFree() {
-	//Prepare the data
-	const auto inversed_diagonal_preconditioner = m_preconditioner_rhs_builder->InversedPreconditioner();
-	const auto rhs = m_preconditioner_rhs_builder->JtDotResidualValue();
-	ApplySpMVBase<6>::Ptr apply_spmv_handler = m_apply_jtj_handler;
-	DeviceArraySlice<float> updated_twist = m_iteration_data.CurrentWarpFieldUpdateBuffer();
-	
-	//sanity check
-	SURFELWARP_CHECK_EQ(rhs.Size(), apply_spmv_handler->MatrixSize());
-	SURFELWARP_CHECK_EQ(updated_twist.Size(), apply_spmv_handler->MatrixSize());
-	SURFELWARP_CHECK_EQ(inversed_diagonal_preconditioner.Size(), apply_spmv_handler->MatrixSize() * 6);
-	
-	//Hand in to warp solver and solve it
-	m_pcg_solver->SetSolverInput(inversed_diagonal_preconditioner, apply_spmv_handler, rhs, updated_twist);
-	m_pcg_solver->Solve(10);
-}
-
 void surfelwarp::WarpSolver::SolvePCGMaterialized(int pcg_iterations) {
 	//Prepare the data
 	const auto inversed_diagonal_preconditioner = m_preconditioner_rhs_builder->InversedPreconditioner();
