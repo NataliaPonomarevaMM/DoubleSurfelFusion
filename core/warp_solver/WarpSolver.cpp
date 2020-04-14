@@ -263,8 +263,8 @@ void surfelwarp::WarpSolver::SetNode2TermIndexInput() {
 	m_node2term_index->SetInputs(
 		dense_depth_knn,
 		node_graph,
-        node_bind_index,
 		m_warpfield_input.node_se3.Size(),
+        node_bind_index,
 		foreground_mask_knn,
 		sparse_feature_knn
 	);
@@ -274,6 +274,7 @@ void surfelwarp::WarpSolver::SetNode2TermIndexInput() {
 		num_nodes,
 		dense_depth_knn,
 		node_graph,
+		node_bind_index,
 		foreground_mask_knn,
 		sparse_feature_knn
 	);

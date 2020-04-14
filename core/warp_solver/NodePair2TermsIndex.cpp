@@ -68,6 +68,7 @@ void surfelwarp::NodePair2TermsIndex::SetInputs(
 	unsigned num_nodes,
 	surfelwarp::DeviceArrayView<ushort4> dense_image_knn,
 	surfelwarp::DeviceArrayView<ushort2> node_graph,
+    DeviceArrayView<int> node_bind_index,
 	surfelwarp::DeviceArrayView<ushort4> foreground_mask_knn,
 	surfelwarp::DeviceArrayView<ushort4> sparse_feature_knn)
 {
@@ -83,6 +84,7 @@ void surfelwarp::NodePair2TermsIndex::SetInputs(
 		m_term_offset,
 		dense_image_knn,
 		node_graph,
+		node_bind_index,
 		foreground_mask_knn,
 		sparse_feature_knn
 	);

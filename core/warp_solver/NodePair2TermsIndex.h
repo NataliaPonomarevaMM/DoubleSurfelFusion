@@ -30,6 +30,7 @@ namespace surfelwarp {
 			unsigned num_nodes,
 			DeviceArrayView<ushort4> dense_image_knn,
 			DeviceArrayView<ushort2> node_graph,
+            DeviceArrayView<int> node_bind_index,
 			//These costs might be empty
 			DeviceArrayView<ushort4> foreground_mask_knn = DeviceArrayView<ushort4>(),
 			DeviceArrayView<ushort4> sparse_feature_knn  = DeviceArrayView<ushort4>()

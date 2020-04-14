@@ -10,6 +10,7 @@ namespace surfelwarp { namespace device {
 		DeviceArrayView<float4> points,
 		int* encoded_voxel_key,
         int* voxel_ind,
+        int* voxel_key_ind,
 		const float voxel_size
 	) {
 		const auto idx = threadIdx.x + blockDim.x * blockIdx.x;
@@ -20,6 +21,7 @@ namespace surfelwarp { namespace device {
 		const int encoded = encodeVoxel(voxel_x, voxel_y, voxel_z);
 		encoded_voxel_key[idx] = encoded;
         voxel_ind[idx] = idx;
+        voxel_key_ind[idx] = encoded;
 	}
 
 	__global__ void labelSortedVoxelKeyKernel(
@@ -107,7 +109,6 @@ void surfelwarp::VoxelSubsamplerSorting::AllocateBuffer(unsigned max_input_point
 	const auto compacted_max_size = max_input_points / 5;
 	m_compacted_voxel_key.AllocateBuffer(compacted_max_size);
 	m_compacted_voxel_offset.AllocateBuffer(compacted_max_size);
-	m_subsampled_point.AllocateBuffer(compacted_max_size);
 }
 
 void surfelwarp::VoxelSubsamplerSorting::ReleaseBuffer() {
@@ -118,7 +119,6 @@ void surfelwarp::VoxelSubsamplerSorting::ReleaseBuffer() {
 	//smaller buffer
 	m_compacted_voxel_key.ReleaseBuffer();
 	m_compacted_voxel_offset.ReleaseBuffer();
-	m_subsampled_point.ReleaseBuffer();
 }
 
 void surfelwarp::VoxelSubsamplerSorting::PerformSubsample(
@@ -149,6 +149,7 @@ void surfelwarp::VoxelSubsamplerSorting::buildVoxelKeyForPoints(
 		points,
 		m_point_key,
 		m_point_ind,
+		m_point_key_ind,
 		voxel_size
 	);
 	
@@ -165,7 +166,7 @@ void surfelwarp::VoxelSubsamplerSorting::sortCompactVoxelKeys(
 ) {
 	//Perform sorting
 	m_point_key_sort.Sort(m_point_key.ArrayReadOnly(), points, stream);
-    m_point_ind_sort.Sort(m_point_ind.ArrayReadOnly(), points, stream);
+    m_point_ind_sort.Sort(m_point_key_ind.ArrayReadOnly(), m_point_ind.ArrayReadOnly(), stream);
 	//Label the sorted keys
 	m_voxel_label.ResizeArrayOrException(points.Size());
 	dim3 blk(128);
@@ -228,7 +229,7 @@ void surfelwarp::VoxelSubsamplerSorting::collectSynchronizeSubsampledPoint(
 		m_compacted_voxel_key.ArrayView(),
 		m_compacted_voxel_offset,
 		m_point_key_sort.valid_sorted_value,
-		m_point_ind_sort.valid_sorted_value
+		m_point_ind_sort.valid_sorted_value,
 		voxel_size,
 		subsampled_points_slice,
 		subsampled_points_ind_slice

@@ -18,6 +18,7 @@ namespace surfelwarp {
 		float m_lambda_density;
 		float m_lambda_foreground;
 		float m_lambda_feature;
+		float m_lambda_bind;
 		
 		//Only modifiable by warp solver
 		friend class SolverIterationData;
@@ -34,6 +35,9 @@ namespace surfelwarp {
 		
 		__host__ __device__ __forceinline__ float Smooth() const { return m_lambda_smooth; }
 		__host__ __device__ __forceinline__ float SmoothSquared() const { return m_lambda_smooth * m_lambda_smooth; }
+
+        __host__ __device__ __forceinline__ float Bind() const { return m_lambda_bind; }
+        __host__ __device__ __forceinline__ float BindSquared() const { return m_lambda_bind * m_lambda_bind; }
 		
 		__host__ __device__ __forceinline__ float Density() const { return m_lambda_density; }
 		__host__ __device__ __forceinline__ float DensitySquared() const { return m_lambda_density * m_lambda_density; }

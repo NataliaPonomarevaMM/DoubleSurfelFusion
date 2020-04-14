@@ -13,11 +13,13 @@ surfelwarp::PenaltyConstants::PenaltyConstants() {
 void surfelwarp::PenaltyConstants::setDefaultValue() {
 #if defined(USE_DENSE_SOLVER_MAPS)
 	m_lambda_smooth = 2.3f;
+	m_lambda_bind = 1.0f;
 	m_lambda_density = 0.0f;
 	m_lambda_foreground = 0.0f;
 	m_lambda_feature = 0.7f;
 #else
 	m_lambda_smooth = 2.0f;
+	m_lambda_bind = 1.0f;
 	m_lambda_density = 0.0f;
 	m_lambda_foreground = 0.0f;
 	m_lambda_feature = 0.0f;
@@ -26,6 +28,7 @@ void surfelwarp::PenaltyConstants::setDefaultValue() {
 
 void surfelwarp::PenaltyConstants::setGlobalIterationValue(bool use_foreground) {
 	m_lambda_smooth = 2.3f;
+    m_lambda_bind = 1.0f;
 	m_lambda_density = 0.0f;
 	if(use_foreground)
 		m_lambda_foreground = 2e-3f;
@@ -36,6 +39,7 @@ void surfelwarp::PenaltyConstants::setGlobalIterationValue(bool use_foreground) 
 
 void surfelwarp::PenaltyConstants::setLocalIterationValue(bool use_density) {
 	m_lambda_smooth = 2.3f;
+    m_lambda_bind = 1.0f;
 	if(use_density)
 		m_lambda_density = 1e-2f;
 	else

@@ -126,6 +126,9 @@ namespace surfelwarp {
 		DeviceArrayView<float3> Ti_xj;
 		DeviceArrayView<float3> Tj_xj;
 		DeviceArrayView<unsigned char> validity_indicator;
+
+        DeviceArrayView<float4> reference_node_coords;
+        DeviceArrayView<DualQuaternion> node_se3;
 	};
 
     struct NodeGraphBindTerm2Jacobian {
@@ -139,6 +142,10 @@ namespace surfelwarp {
 		DeviceArrayView<float4> warped_vertex;
 		DeviceArrayView<ushort4> knn;
 		DeviceArrayView<float4> knn_weight;
+
+        //These are deprecated and should not be used
+        DeviceArrayView<float4> reference_vertex; //Query from rendered vertex map
+        DeviceArrayView<DualQuaternion> node_se3;
 	};
 	
 	

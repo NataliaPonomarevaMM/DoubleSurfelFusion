@@ -1,6 +1,7 @@
-#include "core/warp_solver/NodeGraphSmoothHandler.h"
+#include "core/warp_solver/NodeGraphBindHandler.h"
 #include "common/Constants.h"
 #include "core/warp_solver/solver_constants.h"
+#include "core/smpl/cuda/apply.cuh"
 
 #include <device_launch_parameters.h>
 
@@ -39,10 +40,9 @@ namespace surfelwarp { namespace device {
                 PtrSz<int> index
         ) {
             int on = 0;
-            for (int i = 0; i < node_index.Size(); i++) {
-                if (onbody[node_index[i]]) {
+            for (int i = 0; i < node_index.Size(); i++)
+                if (onbody[node_index[i]])
                     index[on++] = i;
-            }
         }
     } // device
 } // surfelwarp
@@ -54,14 +54,14 @@ surfelwarp::NodeGraphBindHandler::NodeGraphBindHandler() {
     xi_.AllocateBuffer(num_bind_terms);
 }
 
-surfelwarp::NodeGraphSmoothHandler::~NodeGraphSmoothHandler() {
+surfelwarp::NodeGraphBindHandler::~NodeGraphBindHandler() {
     Ti_xi_.ReleaseBuffer();
     xi_.ReleaseBuffer();
 }
 
 void surfelwarp::NodeGraphBindHandler::SetInputs(
         const DeviceArrayView<DualQuaternion>& node_se3,
-        const DeviceArrayView<float4>& reference_nodes
+        const DeviceArrayView<float4>& reference_nodes,
         const DeviceArrayView<int> &node_index,
         const SMPL::SolverInput &smpl_input
 ) {
@@ -79,15 +79,18 @@ void surfelwarp::NodeGraphBindHandler::SetInputs(
  */
 void surfelwarp::NodeGraphBindHandler::BuildTerm2Jacobian(cudaStream_t stream) {
     std::vector<int> h_node_ind, h_onbody;
-    m_node_index.download(h_node_ind);
-    m_onbody.download(h_onbody);
+    m_node_index.Download(h_node_ind);
+    m_onbody.Download(h_onbody);
 
-    int count = 0
+    int count = 0;
     for (int i = 0; i < h_node_ind.size(); i++) {
         const auto smpl_idx = h_onbody[h_node_ind[i]];
         if (smpl_idx != -1)
             count++;
     }
+    m_index = DeviceArray<int>(count);
+    device::fill_index<<<1,1,0,stream>>>(m_node_index, m_onbody.RawPtr(), m_index);
+
     Ti_xi_.ResizeArrayOrException(count);
     xi_.ResizeArrayOrException(count);
 
@@ -118,11 +121,4 @@ surfelwarp::NodeGraphBindTerm2Jacobian surfelwarp::NodeGraphBindHandler::Term2Ja
     map.Ti_xi = Ti_xi_.ArrayView();
     map.xi = xi_.ArrayView();
     return map;
-}
-
-DeviceArrayView<int> surfelwarp::NodeGraphBindHandler::GetIndex() const
-{
-    auto index = DeviceArray<int>(count);
-    device::fill_index<<<1,1,0,stream>>>(m_node_index, m_onbody.RawPtr(), m_index);
-    return DeviceArrayView<int>(index);
 }

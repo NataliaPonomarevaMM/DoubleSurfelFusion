@@ -38,6 +38,7 @@ namespace surfelwarp {
 		 */
 	private:
 		DeviceBufferArray<int> m_point_key;
+        DeviceBufferArray<int> m_point_key_ind;
         DeviceBufferArray<int> m_point_ind;
 		void buildVoxelKeyForPoints(const DeviceArrayView<float4>& points, const float voxel_size, cudaStream_t stream = 0);
 
@@ -54,6 +55,7 @@ namespace surfelwarp {
 		//Collected the subsampled points and sync it to host
 		void collectSynchronizeSubsampledPoint(
 			SynchronizeArray<float4>& subsampled_points,
+            surfelwarp::SynchronizeArray<int> &subsampled_points_ind,
 			const float voxel_size,
 			cudaStream_t stream = 0
 		);

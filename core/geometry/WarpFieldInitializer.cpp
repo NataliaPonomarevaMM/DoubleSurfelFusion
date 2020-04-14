@@ -26,19 +26,19 @@ void surfelwarp::WarpFieldInitializer::InitializeReferenceNodeAndSE3FromVertex(
 ) {
 	//First subsampling
     SynchronizeArray<float4> onbody_node_candidates;
-    SynchronizeArray<float4> onbody_node_ind;
+    SynchronizeArray<int> onbody_node_ind;
     onbody_node_candidates.AllocateBuffer(Constants::kMaxSubsampleFrom * Constants::kMaxNumNodes);
     onbody_node_ind.AllocateBuffer(Constants::kMaxSubsampleFrom * Constants::kMaxNumNodes);
 	if (onbody_vertex.Size() > 0)
-	    m_vertex_subsampler->PerformSubsample(onbody_vertex, onbody_node_candidates, onbody_node_ind
+	    m_vertex_subsampler->PerformSubsample(onbody_vertex, onbody_node_candidates, onbody_node_ind,
             0.7f * Constants::kNodeRadius, stream);
 
     SynchronizeArray<float4> farbody_node_candidates;
-    SynchronizeArray<float4> farbody_node_ind;
+    SynchronizeArray<int> farbody_node_ind;
 	farbody_node_candidates.AllocateBuffer(Constants::kMaxSubsampleFrom * Constants::kMaxNumNodes);
     farbody_node_ind.AllocateBuffer(Constants::kMaxSubsampleFrom * Constants::kMaxNumNodes);
 	if (farbody_vertex.Size() > 0)
-   		m_vertex_subsampler->PerformSubsample(farbody_vertex, farbody_node_candidates, farbody_node_ind
+   		m_vertex_subsampler->PerformSubsample(farbody_vertex, farbody_node_candidates, farbody_node_ind,
             2.0f * Constants::kNodeRadius, stream);
 
     auto h_onbody = onbody_node_candidates.HostArray();

@@ -47,7 +47,7 @@ namespace surfelwarp {
         );
         void BuildTerm2Jacobian(cudaStream_t stream = 0);
         NodeGraphBindTerm2Jacobian Term2JacobianMap() const;
-        DeviceArrayView<int> GetIndex() const;
+        DeviceArrayView<int> GetIndex() const { return DeviceArrayView<int>(m_index); };
     };
 } // surfelwarp
 
