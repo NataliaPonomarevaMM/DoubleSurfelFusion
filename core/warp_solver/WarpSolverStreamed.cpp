@@ -72,6 +72,9 @@ void surfelwarp::WarpSolver::buildSolverIndexStreamed() {
 	m_image_knn_fetcher->SyncQueryCompactedPotentialPixelSize(m_solver_stream[0]); //Sync is inside the method
 	m_density_foreground_handler->QueryCompactedMaskPixelArraySize(m_solver_stream[1]); //Sync is inside the method
 	m_sparse_correspondence_handler->QueryCompactedArraySize(m_solver_stream[2]); //Sync is inside the method
+    computeBindTermNode2Jacobian(m_solver_stream[3]);
+    cudaSafeCall(cudaStreamSynchronize(m_solver_stream[3]));
+
 	setDenseDepthHandlerFullInput();
 	setDensityForegroundHandlerFullInput();
 
@@ -98,7 +101,6 @@ void surfelwarp::WarpSolver::solverIterationGlobalIterationStreamed() {
 
 	//The computation of diagonal blks JtJ and JtError
 	SetPreconditionerBuilderAndJtJApplierInput();
-	SetJtJMaterializerInput();
     m_preconditioner_rhs_builder->ComputeDiagonalPreconditionerGlobalIteration(m_solver_stream[0]);
     m_preconditioner_rhs_builder->ComputeJtResidualGlobalIteration(m_solver_stream[1]);
     m_jtj_materializer->BuildMaterializedJtJNondiagonalBlocksGlobalIteration(m_solver_stream[2]);
@@ -131,7 +133,6 @@ void surfelwarp::WarpSolver::solverIterationLocalIterationStreamed() {
 
 	//The computation of diagonal blks JtJ and JtError
 	SetPreconditionerBuilderAndJtJApplierInput();
-	SetJtJMaterializerInput();
     m_preconditioner_rhs_builder->ComputeDiagonalPreconditioner(m_solver_stream[0]);
     m_preconditioner_rhs_builder->ComputeJtResidual(m_solver_stream[1]);
     m_jtj_materializer->BuildMaterializedJtJNondiagonalBlocks(m_solver_stream[2]);

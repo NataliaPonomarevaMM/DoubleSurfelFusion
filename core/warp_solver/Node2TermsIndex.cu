@@ -1,5 +1,6 @@
 #include "core/warp_solver/Node2TermsIndex.h"
 #include "core/warp_solver/term_offset_types.h"
+#include "Node2TermsIndex.h"
 #include <device_launch_parameters.h>
 
 namespace surfelwarp { namespace device {
@@ -7,6 +8,7 @@ namespace surfelwarp { namespace device {
 	__global__ void buildTermKeyValueKernel(
 		DeviceArrayView<ushort4> dense_image_knn,
 		DeviceArrayView<ushort2> node_graph,
+        DeviceArrayView<int> node_bind_index,
 		//These terms might be empty
 		DeviceArrayView<ushort4> foreground_mask_knn,
 		DeviceArrayView<ushort4> sparse_feature_knn,
@@ -89,6 +91,18 @@ namespace surfelwarp { namespace device {
 			term_values[fill_offset + 3] = term_idx;
 			return;
 		}
+        //For bind term
+        term_offset += sparse_feature_knn.Size();
+        kv_offset += 4 * sparse_feature_knn.Size();
+        if(term_idx < term_offset + node_bind_index.Size())
+        {
+            const auto in_term_offset = term_idx - term_offset;
+            const auto fill_offset = kv_offset + 1 * in_term_offset;
+            const auto node = node_bind_index[in_term_offset];
+            node_keys[fill_offset] = node;
+            term_values[fill_offset] = term_idx;
+            return;
+        }
 	} // The kernel to fill the key-value pairs
 
 	__global__ void computeTermOffsetKernel(
@@ -129,6 +143,7 @@ void surfelwarp::Node2TermsIndex::buildTermKeyValue(cudaStream_t stream) {
 	device::buildTermKeyValueKernel<<<grid, blk, 0, stream>>>(
 		m_term2node.dense_image_knn,
 		m_term2node.node_graph,
+		m_term2node.node_bind_index,
 		m_term2node.foreground_mask_knn, 
 		m_term2node.sparse_feature_knn,
 		m_node_keys.Ptr(), 

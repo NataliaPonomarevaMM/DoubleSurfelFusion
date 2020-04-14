@@ -126,11 +126,12 @@ namespace surfelwarp {
 		DeviceArrayView<float3> Ti_xj;
 		DeviceArrayView<float3> Tj_xj;
 		DeviceArrayView<unsigned char> validity_indicator;
-
-		//These are deprecated and should not be used
-		DeviceArrayView<float4> reference_node_coords;
-		DeviceArrayView<DualQuaternion> node_se3;
 	};
+
+    struct NodeGraphBindTerm2Jacobian {
+        DeviceArrayView<float3> Ti_xi;
+        DeviceArrayView<float3> xi;
+    };
 	
 	
 	struct Point2PointICPTerm2Jacobian {
@@ -138,11 +139,6 @@ namespace surfelwarp {
 		DeviceArrayView<float4> warped_vertex;
 		DeviceArrayView<ushort4> knn;
 		DeviceArrayView<float4> knn_weight;
-		
-		
-		//These are deprecated and should not be used
-		DeviceArrayView<float4> reference_vertex; //Query from rendered vertex map
-		DeviceArrayView<DualQuaternion> node_se3;
 	};
 	
 	
@@ -151,6 +147,7 @@ namespace surfelwarp {
 	struct Term2JacobianMaps {
 		DenseDepthTerm2Jacobian dense_depth_term;
 		NodeGraphSmoothTerm2Jacobian smooth_term;
+        NodeGraphBindTerm2Jacobian bind_term;
 		DensityMapTerm2Jacobian density_map_term;
 		ForegroundMaskTerm2Jacobian foreground_mask_term;
 		Point2PointICPTerm2Jacobian sparse_feature_term;

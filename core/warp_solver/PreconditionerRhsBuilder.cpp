@@ -24,6 +24,7 @@ void surfelwarp::PreconditionerRhsBuilder::SetInputs(
 	Node2TermMap node2term,
 	DenseDepthTerm2Jacobian dense_depth_term,
 	NodeGraphSmoothTerm2Jacobian smooth_term,
+    NodeGraphBindTerm2Jacobian bind_term,
 	DensityMapTerm2Jacobian density_map_term,
 	ForegroundMaskTerm2Jacobian foreground_mask_term,
 	Point2PointICPTerm2Jacobian sparse_feature_term,
@@ -33,6 +34,7 @@ void surfelwarp::PreconditionerRhsBuilder::SetInputs(
 	
 	m_term2jacobian_map.dense_depth_term = dense_depth_term;
 	m_term2jacobian_map.smooth_term = smooth_term;
+    m_term2jacobian_map.bind_term = bind_term;
 	m_term2jacobian_map.density_map_term = density_map_term;
 	m_term2jacobian_map.foreground_mask_term = foreground_mask_term;
 	m_term2jacobian_map.sparse_feature_term = sparse_feature_term;

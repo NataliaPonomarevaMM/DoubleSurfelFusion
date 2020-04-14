@@ -9,6 +9,7 @@ namespace surfelwarp { namespace device {
 	__global__ void createVoxelKeyKernel(
 		DeviceArrayView<float4> points,
 		int* encoded_voxel_key,
+        int* voxel_ind,
 		const float voxel_size
 	) {
 		const auto idx = threadIdx.x + blockDim.x * blockIdx.x;
@@ -18,6 +19,7 @@ namespace surfelwarp { namespace device {
 		const int voxel_z = __float2int_rd(points[idx].z / voxel_size);
 		const int encoded = encodeVoxel(voxel_x, voxel_y, voxel_z);
 		encoded_voxel_key[idx] = encoded;
+        voxel_ind[idx] = idx;
 	}
 
 	__global__ void labelSortedVoxelKeyKernel(
@@ -57,8 +59,10 @@ namespace surfelwarp { namespace device {
 		const DeviceArrayView<int> compacted_key,
 		const int* compacted_offset,
 		const float4* sorted_points,
+        const int* sorted_points_ind,
 		const float voxel_size,
-		float4* sampled_points
+		float4* sampled_points,
+        int* sampled_points_ind
 	) {
 		const auto idx = threadIdx.x + blockDim.x * blockIdx.x;
 		if (idx >= compacted_key.Size()) return;
@@ -87,6 +91,7 @@ namespace surfelwarp { namespace device {
 
 		// Store the result to global memory
 		sampled_points[idx] = sorted_points[min_dist_idx];
+        sampled_points_ind[idx] = sorted_points_ind[min_dist_idx];
 	}
 
 }; // namespace device
@@ -116,26 +121,16 @@ void surfelwarp::VoxelSubsamplerSorting::ReleaseBuffer() {
 	m_subsampled_point.ReleaseBuffer();
 }
 
-surfelwarp::DeviceArrayView<float4> surfelwarp::VoxelSubsamplerSorting::PerformSubsample(
-	const surfelwarp::DeviceArrayView<float4> &points,
-	const float voxel_size,
-	cudaStream_t stream
-) {
-	buildVoxelKeyForPoints(points, voxel_size, stream);
-	sortCompactVoxelKeys(points, stream);
-	collectSubsampledPoint(m_subsampled_point, voxel_size, stream);
-	return m_subsampled_point.ArrayView();
-}
-
 void surfelwarp::VoxelSubsamplerSorting::PerformSubsample(
 	const surfelwarp::DeviceArrayView<float4> &points,
 	surfelwarp::SynchronizeArray<float4> &subsampled_points,
+    surfelwarp::SynchronizeArray<int> &subsampled_points_ind,
 	const float voxel_size,
 	cudaStream_t stream
 ) {
 	buildVoxelKeyForPoints(points, voxel_size, stream);
 	sortCompactVoxelKeys(points, stream);
-	collectSynchronizeSubsampledPoint(subsampled_points, voxel_size, stream);
+	collectSynchronizeSubsampledPoint(subsampled_points, subsampled_points_ind, voxel_size, stream);
 }
 
 void surfelwarp::VoxelSubsamplerSorting::buildVoxelKeyForPoints(
@@ -145,6 +140,7 @@ void surfelwarp::VoxelSubsamplerSorting::buildVoxelKeyForPoints(
 ) {
 	//Correct the size of arrays
 	m_point_key.ResizeArrayOrException(points.Size());
+    m_point_ind.ResizeArrayOrException(points.Size());
 	
 	//Call the method
 	dim3 blk(256);
@@ -152,6 +148,7 @@ void surfelwarp::VoxelSubsamplerSorting::buildVoxelKeyForPoints(
 	device::createVoxelKeyKernel<<<grid, blk, 0, stream>>>(
 		points,
 		m_point_key,
+		m_point_ind,
 		voxel_size
 	);
 	
@@ -168,7 +165,7 @@ void surfelwarp::VoxelSubsamplerSorting::sortCompactVoxelKeys(
 ) {
 	//Perform sorting
 	m_point_key_sort.Sort(m_point_key.ArrayReadOnly(), points, stream);
-	
+    m_point_ind_sort.Sort(m_point_ind.ArrayReadOnly(), points, stream);
 	//Label the sorted keys
 	m_voxel_label.ResizeArrayOrException(points.Size());
 	dim3 blk(128);
@@ -212,35 +209,9 @@ void surfelwarp::VoxelSubsamplerSorting::sortCompactVoxelKeys(
 #endif
 }
 
-void surfelwarp::VoxelSubsamplerSorting::collectSubsampledPoint(
-	surfelwarp::DeviceBufferArray<float4> &subsampled_points,
-	const float voxel_size,
-	cudaStream_t stream
-) {
-	//Correct the size
-	const auto num_voxels = m_compacted_voxel_key.ArraySize();
-	subsampled_points.ResizeArrayOrException(num_voxels);
-	
-	//Everything is ok
-	dim3 sample_blk(128);
-	dim3 sample_grid(divUp(num_voxels, sample_blk.x));
-	device::samplingPointsKernel<<<sample_grid, sample_blk, 0, stream>>>(
-		m_compacted_voxel_key.ArrayView(),
-		m_compacted_voxel_offset,
-		m_point_key_sort.valid_sorted_value,
-		voxel_size,
-		subsampled_points
-	);
-
-	//Sync and check error
-#if defined(CUDA_DEBUG_SYNC_CHECK)
-	cudaSafeCall(cudaStreamSynchronize(stream));
-	cudaSafeCall(cudaGetLastError());
-#endif
-}
-
 void surfelwarp::VoxelSubsamplerSorting::collectSynchronizeSubsampledPoint(
 	surfelwarp::SynchronizeArray<float4> &subsampled_points,
+    surfelwarp::SynchronizeArray<int> &subsampled_points_ind,
 	const float voxel_size,
 	cudaStream_t stream
 ) {
@@ -250,18 +221,22 @@ void surfelwarp::VoxelSubsamplerSorting::collectSynchronizeSubsampledPoint(
 	
 	//Hand on it to device
 	auto subsampled_points_slice = subsampled_points.DeviceArrayReadWrite();
+    auto subsampled_points_ind_slice = subsampled_points_ind.DeviceArrayReadWrite();
 	dim3 sample_blk(128);
 	dim3 sample_grid(divUp(num_voxels, sample_blk.x));
 	device::samplingPointsKernel<<<sample_grid, sample_blk, 0, stream>>>(
 		m_compacted_voxel_key.ArrayView(),
 		m_compacted_voxel_offset,
 		m_point_key_sort.valid_sorted_value,
+		m_point_ind_sort.valid_sorted_value
 		voxel_size,
-		subsampled_points_slice
+		subsampled_points_slice,
+		subsampled_points_ind_slice
 	);
 	
 	//Sync it to host
 	subsampled_points.SynchronizeToHost(stream);
+    subsampled_points_ind.SynchronizeToHost(stream);
 	
 	//Sync and check error
 #if defined(CUDA_DEBUG_SYNC_CHECK)

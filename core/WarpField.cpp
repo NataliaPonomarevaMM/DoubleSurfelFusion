@@ -75,15 +75,11 @@ void surfelwarp::WarpField::BuildNodeGraph(cudaStream_t stream) {
 /* The accessing methods
  */
 surfelwarp::WarpField::SolverInput surfelwarp::WarpField::SolverAccess() const {
-	//Debug
-	//LOG(INFO) << "Random warp field input";
-	//DeviceArraySlice<DualQuaternion> node_se3_slice((DualQuaternion*)m_node_se3.DevicePtr(), m_node_se3.DeviceArraySize());
-	//applyRandomSE3ToWarpField(node_se3_slice, 0.01, 0.02);
-	
 	SolverInput solver_input;
 	solver_input.node_se3 = m_node_se3.DeviceArrayReadOnly();
 	solver_input.reference_node_coords = m_reference_node_coords.DeviceArrayReadOnly();
 	solver_input.node_graph = m_node_graph.ArrayReadOnly();
+    solver_input.node_index = m_node_index.DeviceArrayReadOnly();
 	return solver_input;
 }
 

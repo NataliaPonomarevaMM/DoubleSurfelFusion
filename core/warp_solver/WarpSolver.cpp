@@ -35,20 +35,15 @@ void surfelwarp::WarpSolver::AllocateBuffer() {
     m_sparse_correspondence_handler = std::make_shared<SparseCorrespondenceHandler>();
     m_sparse_correspondence_handler->AllocateBuffer();
     m_graph_smooth_handler = std::make_shared<NodeGraphSmoothHandler>();
+    m_graph_bind_handler = std::make_shared<NodeGraphBindHandler>();
     m_node2term_index = std::make_shared<Node2TermsIndex>();
     m_node2term_index->AllocateBuffer();
-#if defined(USE_MATERIALIZED_JTJ)
     m_nodepair2term_index = std::make_shared<NodePair2TermsIndex>();
 	m_nodepair2term_index->AllocateBuffer();
-#endif
     m_preconditioner_rhs_builder = std::make_shared<PreconditionerRhsBuilder>();
     m_preconditioner_rhs_builder->AllocateBuffer();
-    m_apply_jtj_handler = std::make_shared<ApplyJtJHandlerMatrixFree>();
-    m_apply_jtj_handler->AllocateBuffer();
-#if defined(USE_MATERIALIZED_JTJ)
     m_jtj_materializer = std::make_shared<JtJMaterializer>();
 	m_jtj_materializer->AllocateBuffer();
-#endif
     const auto max_matrix_size = 6 * Constants::kMaxNumNodes;
     m_pcg_solver = std::make_shared<BlockPCG<6>>(max_matrix_size);
 	
@@ -67,14 +62,9 @@ void surfelwarp::WarpSolver::ReleaseBuffer() {
     m_density_foreground_handler->ReleaseBuffer();
     m_sparse_correspondence_handler->ReleaseBuffer();
     m_node2term_index->ReleaseBuffer();
-#if defined(USE_MATERIALIZED_JTJ)
     m_nodepair2term_index->ReleaseBuffer();
-#endif
     m_preconditioner_rhs_builder->ReleaseBuffer();
-    m_apply_jtj_handler->ReleaseBuffer();
-#if defined(USE_MATERIALIZED_JTJ)
     m_jtj_materializer->ReleaseBuffer();
-#endif
 }
 
 //The input interface
@@ -246,24 +236,39 @@ void surfelwarp::WarpSolver::computeSmoothTermNode2Jacobian(cudaStream_t stream)
 	m_graph_smooth_handler->BuildTerm2Jacobian(stream);
 }
 
+/* The method for bind term handler
+ */
+void surfelwarp::WarpSolver::computeBindTermNode2Jacobian(cudaStream_t stream) {
+    //Prepare the input
+    m_graph_bind_handler->SetInputs(
+            m_iteration_data.CurrentWarpFieldInput(),
+            m_warpfield_input.reference_node_coords,
+            m_warpfield_input.node_index,
+            m_smpl_input
+    );
+
+    //Do it
+    m_graph_bind_handler->BuildTerm2Jacobian(stream);
+}
+
 /* The index from node to term index
  */
 void surfelwarp::WarpSolver::SetNode2TermIndexInput() {
 	const auto dense_depth_knn = m_image_knn_fetcher->DenseImageTermKNNArray();
-	//const auto density_map_knn = m_image_knn_fetcher->DenseImageTermKNNArray();
 	const auto density_map_knn = DeviceArrayView<ushort4>(); //Empty
 	const auto node_graph = m_warpfield_input.node_graph;
+	const auto node_bind_index = m_graph_bind_handler->GetIndex();
 	const auto foreground_mask_knn = m_density_foreground_handler->ForegroundMaskTermKNN();
 	const auto sparse_feature_knn = m_sparse_correspondence_handler->SparseFeatureKNN();
 	m_node2term_index->SetInputs(
 		dense_depth_knn,
 		node_graph,
+        node_bind_index,
 		m_warpfield_input.node_se3.Size(),
 		foreground_mask_knn,
 		sparse_feature_knn
 	);
 
-#if defined(USE_MATERIALIZED_JTJ)
 	const auto num_nodes = m_warpfield_input.node_se3.Size();
 	m_nodepair2term_index->SetInputs(
 		num_nodes,
@@ -272,7 +277,6 @@ void surfelwarp::WarpSolver::SetNode2TermIndexInput() {
 		foreground_mask_knn,
 		sparse_feature_knn
 	);
-#endif
 }
 
 void surfelwarp::WarpSolver::BuildNodePair2TermIndexBlocked(cudaStream_t stream) {
@@ -281,18 +285,6 @@ void surfelwarp::WarpSolver::BuildNodePair2TermIndexBlocked(cudaStream_t stream)
 	
 	//The later computation depends on the size
 	m_nodepair2term_index->BuildSymmetricAndRowBlocksIndex(stream);
-}
-
-/* Prepare the jacobian for later use
- */
-void surfelwarp::WarpSolver::ComputeTermJacobiansFreeIndex(
-	cudaStream_t dense_depth, cudaStream_t density_map,
-	cudaStream_t foreground_mask, cudaStream_t sparse_feature
-) {
-	m_dense_depth_handler->ComputeJacobianTermsFreeIndex(dense_depth);
-	computeSmoothTermNode2Jacobian(sparse_feature);
-	m_density_foreground_handler->ComputeTwistGradient(density_map, foreground_mask);
-	m_sparse_correspondence_handler->BuildTerm2Jacobian(sparse_feature);
 }
 
 //Assume the SE3 for each term expepted smooth term is updated
@@ -319,6 +311,7 @@ void surfelwarp::WarpSolver::SetPreconditionerBuilderAndJtJApplierInput() {
 	const auto dense_depth_term2jacobian = m_dense_depth_handler->Term2JacobianMap();
 	//The node graph term
 	const auto smooth_term2jacobian = m_graph_smooth_handler->Term2JacobianMap();
+    const auto bind_term2jacobian = m_graph_bind_handler->Term2JacobianMap();
 	//The image map term
 	DensityMapTerm2Jacobian density_term2jacobian;
 	ForegroundMaskTerm2Jacobian foreground_term2jacobian;
@@ -333,22 +326,12 @@ void surfelwarp::WarpSolver::SetPreconditionerBuilderAndJtJApplierInput() {
 		node2term,
 		dense_depth_term2jacobian,
 		smooth_term2jacobian,
+        bind_term2jacobian,
 		density_term2jacobian,
 		foreground_term2jacobian,
 		feature_term2jacobian,
 		penalty_constants
 	);
-	//Hand in the input to jtj applier
-	m_apply_jtj_handler->SetInputs(
-		node2term,
-		dense_depth_term2jacobian,
-		smooth_term2jacobian,
-		density_term2jacobian,
-		foreground_term2jacobian,
-		feature_term2jacobian,
-		penalty_constants
-	);
-
     //Hand in to materializer
     m_jtj_materializer->SetInputs(
             nodepair2term,

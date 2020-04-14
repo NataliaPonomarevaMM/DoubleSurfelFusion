@@ -24,6 +24,7 @@
 #include "core/warp_solver/JtJMaterializer.h"
 #include "core/warp_solver/ApplyJtJMatrixFreeHandler.h"
 #include "core/warp_solver/NodeGraphSmoothHandler.h"
+#include "core/warp_solver/NodeGraphBindHandler.h"
 #include "pcg_solver/BlockPCG.h"
 #include "math/DualQuaternion.hpp"
 #include <memory>
@@ -115,6 +116,10 @@ namespace surfelwarp {
 		NodeGraphSmoothHandler::Ptr m_graph_smooth_handler;
 		void computeSmoothTermNode2Jacobian(cudaStream_t stream);
 
+        /* Hand in the value to node graph term handler*/
+        NodeGraphBindHandler::Ptr m_graph_bind_handler;
+        void computeBindTermNode2Jacobian(cudaStream_t stream);
+
 		/* Build the node to term index
 		 * Depends: correspond depth, valid pixel, node graph, sparse feature*/
 		Node2TermsIndex::Ptr m_node2term_index;
@@ -123,12 +128,6 @@ namespace surfelwarp {
 		void BuildNodePair2TermIndexBlocked(cudaStream_t stream = 0);
 		
 		/* Compute the jacobians for all terms*/
-		void ComputeTermJacobiansFreeIndex(
-			cudaStream_t dense_depth = 0,
-			cudaStream_t density_map = 0,
-			cudaStream_t foreground_mask = 0,
-			cudaStream_t sparse_feature = 0
-		);
 		void ComputeTermJacobianFixedIndex(
 			cudaStream_t dense_depth = 0,
 			cudaStream_t density_map = 0,
@@ -140,8 +139,6 @@ namespace surfelwarp {
 		PreconditionerRhsBuilder::Ptr m_preconditioner_rhs_builder;
         /* Materialize the JtJ matrix*/
         JtJMaterializer::Ptr m_jtj_materializer;
-        /* The method to apply JtJ to a vector*/
-        ApplyJtJHandlerMatrixFree::Ptr m_apply_jtj_handler;
 		void SetPreconditionerBuilderAndJtJApplierInput();
 
 		/* The pcg solver*/

@@ -15,12 +15,12 @@ namespace surfelwarp {
 		Smooth = 1,
 		Foreground = 2,
 		Feature = 3,
-		//DensityMap = 4,
+		Bind = 4,
 		Invalid = 5
 	};
 	
 	struct TermTypeOffset {
-		unsigned offset_value[4];
+		unsigned offset_value[5];
 		
 		//The accessed interface
 		__host__ __device__ __forceinline__ const unsigned& operator[](const int idx) const {
@@ -38,6 +38,7 @@ namespace surfelwarp {
 		__host__ __device__ __forceinline__ unsigned SmoothTermSize() const { return offset_value[1] - offset_value[0]; }
 		__host__ __device__ __forceinline__ unsigned ForegroundTermSize() const { return offset_value[2] - offset_value[1]; }
 		__host__ __device__ __forceinline__ unsigned FeatureTermSize() const { return offset_value[3] - offset_value[2]; }
+        __host__ __device__ __forceinline__ unsigned BindTermSize() const { return offset_value[4] - offset_value[3]; }
 	};
 	
 	
@@ -45,6 +46,7 @@ namespace surfelwarp {
 		TermTypeOffset& offset,
 		DeviceArrayView<ushort4> dense_depth_knn,
 		DeviceArrayView<ushort2> node_graph,
+        DeviceArrayView<int> node_bind_index,
 		//These costs might be empty
 		DeviceArrayView<ushort4> foreground_mask_knn = DeviceArrayView<ushort4>(),
 		DeviceArrayView<ushort4> sparse_feature_knn  = DeviceArrayView<ushort4>()
@@ -58,6 +60,8 @@ namespace surfelwarp {
 		offset.offset_value[2] = prefix_sum;
 		prefix_sum += sparse_feature_knn.Size();
 		offset.offset_value[3] = prefix_sum;
+		prefix_sum += node_bind_index.Size();
+        offset.offset_value[4] = prefix_sum;
 	}
 	
 	__host__ __device__ __forceinline__
@@ -83,6 +87,11 @@ namespace surfelwarp {
 			typed_idx = term_idx - offset[2];
 			return;
 		}
+        if(term_idx >= offset[3] && term_idx < offset[4]) {
+            type = TermType::Bind;
+            typed_idx = term_idx - offset[3];
+            return;
+        }
 
 		//Not a valid term
 		type = TermType::Invalid;
@@ -123,6 +132,14 @@ namespace surfelwarp {
 			scalar_term_idx = scalar_offset + 3 * typed_idx;
 			return;
 		}
+
+        scalar_offset += offset.FeatureTermSize();
+        if(term_idx >= offset[3] && term_idx < offset[4]) {
+            type = TermType::Bind;
+            typed_idx = term_idx - offset[3];
+            scalar_term_idx = scalar_offset + typed_idx;
+            return;
+        }
 
 		//Not a valid term
 		type = TermType::Invalid;
@@ -165,6 +182,14 @@ namespace surfelwarp {
 			nodepair_idx = pair_offset + 6 * typed_idx;
 			return;
 		}
+
+        pair_offset += 6 * offset.FeatureTermSize();
+        if(term_idx >= offset[3] && term_idx < offset[4]) {
+            type = TermType::Bind;
+            typed_idx = term_idx - offset[3];
+            nodepair_idx = pair_offset + 1 * typed_idx;
+            return;
+        }
 
 		//Not a valid term
 		type = TermType::Invalid;

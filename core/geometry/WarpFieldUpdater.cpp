@@ -177,6 +177,7 @@ bool surfelwarp::WarpFieldUpdater::ComputeSE3AtPointHost(
 void surfelwarp::WarpFieldUpdater::InitializeReferenceNodesAndSE3FromCandidates(
 	WarpField &warp_field,
 	const std::vector<float4> &node_candidate,
+	const std::vector<int> &ind_surf_array,
 	cudaStream_t stream
 ) {
 	//Do no touch other elements
@@ -188,6 +189,7 @@ void surfelwarp::WarpFieldUpdater::InitializeReferenceNodesAndSE3FromCandidates(
 	const auto& h_candidate = node_candidate;
 	auto& h_nodes = warp_field.m_reference_node_coords.HostArray();
 	auto& h_node_se3 = warp_field.m_node_se3.HostArray();
+	auto& h_node_ind = warp_field.m_node_index.HostArray();
 	
 	//The host iterations
 	for(auto vert_iter = 0; vert_iter < h_candidate.size(); vert_iter++) {
@@ -204,13 +206,15 @@ void surfelwarp::WarpFieldUpdater::InitializeReferenceNodesAndSE3FromCandidates(
 		//Update the node position and se3
 		if(is_node) {
 			h_nodes.emplace_back(make_float4(point.x, point.y, point.z, 1.0f));
-			h_node_se3.emplace_back(DualQuaternion(Quaternion(1, 0, 0, 0), Quaternion(0, 0, 0, 0)));
+            h_node_ind.emplace_back(ind_surf_array[vert_iter]);
+            h_node_se3.emplace_back(DualQuaternion(Quaternion(1, 0, 0, 0), Quaternion(0, 0, 0, 0)));
 		}
 	}
 	
 	//Sync to device
 	warp_field.m_reference_node_coords.SynchronizeToDevice(stream);
 	warp_field.m_node_se3.SynchronizeToDevice(stream);
+    warp_field.m_node_index.SynchronizeToDevice(stream);
 	
 	//Resize other arrays
 	const auto num_nodes = warp_field.m_reference_node_coords.HostArraySize();

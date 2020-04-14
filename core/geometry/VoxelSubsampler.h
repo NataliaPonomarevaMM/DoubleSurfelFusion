@@ -22,17 +22,12 @@ namespace surfelwarp {
 		//Again, explicit malloc
 		virtual void AllocateBuffer(unsigned max_input_points) = 0;
 		virtual void ReleaseBuffer() = 0;
-		
-		//The interface functions
-		virtual DeviceArrayView<float4> PerformSubsample(
-			const DeviceArrayView<float4>& points,
-			const float voxel_size,
-			cudaStream_t stream = 0
-		) = 0;
+
 		
 		virtual void PerformSubsample(
 			const DeviceArrayView<float4>& points,
 			SynchronizeArray<float4>& subsampled_points,
+            SynchronizeArray<int>& subsampled_points_ind,
 			const float voxel_size,
 			cudaStream_t stream = 0
 		) = 0;

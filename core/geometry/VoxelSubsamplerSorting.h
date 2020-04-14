@@ -22,19 +22,13 @@ namespace surfelwarp {
 		//Again, explicit malloc
 		void AllocateBuffer(unsigned max_input_points) override;
 		void ReleaseBuffer() override;
-		
-		//The main interface
-		DeviceArrayView<float4> PerformSubsample(
-			const DeviceArrayView<float4>& points,
-			const float voxel_size,
-			cudaStream_t stream = 0
-		) override;
-		
+
 		//Assume PRE-ALLOCATRED buffer and the
 		//AllocateBuffer has been invoked
 		void PerformSubsample(
 			const DeviceArrayView<float4>& points,
 			SynchronizeArray<float4>& subsampled_points,
+            SynchronizeArray<int>& subsampled_points_ind,
 			const float voxel_size,
 			cudaStream_t stream = 0
 		) override;
@@ -44,27 +38,19 @@ namespace surfelwarp {
 		 */
 	private:
 		DeviceBufferArray<int> m_point_key;
+        DeviceBufferArray<int> m_point_ind;
 		void buildVoxelKeyForPoints(const DeviceArrayView<float4>& points, const float voxel_size, cudaStream_t stream = 0);
-		
-		
+
 		/* Perform sorting and compaction on the voxel key
 		 */
 		KeyValueSort<int, float4> m_point_key_sort;
+        KeyValueSort<int, int> m_point_ind_sort;
 		DeviceBufferArray<unsigned> m_voxel_label;
 		PrefixSum m_voxel_label_prefixsum;
 		DeviceBufferArray<int> m_compacted_voxel_key;
 		DeviceBufferArray<int> m_compacted_voxel_offset;
 		void sortCompactVoxelKeys(const DeviceArrayView<float4>& points, cudaStream_t stream = 0);
-		
-		
-		/* Collect the subsampled point given the compacted offset
-		 */
-		DeviceBufferArray<float4> m_subsampled_point; //Optional, for output if no buffer is provided
-		void collectSubsampledPoint(
-			DeviceBufferArray<float4>& subsampled_points,
-			const float voxel_size,
-			cudaStream_t stream = 0
-		);
+
 		//Collected the subsampled points and sync it to host
 		void collectSynchronizeSubsampledPoint(
 			SynchronizeArray<float4>& subsampled_points,

@@ -26,20 +26,28 @@ void surfelwarp::WarpFieldInitializer::InitializeReferenceNodeAndSE3FromVertex(
 ) {
 	//First subsampling
     SynchronizeArray<float4> onbody_node_candidates;
+    SynchronizeArray<float4> onbody_node_ind;
     onbody_node_candidates.AllocateBuffer(Constants::kMaxSubsampleFrom * Constants::kMaxNumNodes);
+    onbody_node_ind.AllocateBuffer(Constants::kMaxSubsampleFrom * Constants::kMaxNumNodes);
 	if (onbody_vertex.Size() > 0)
-	    m_vertex_subsampler->PerformSubsample(onbody_vertex, onbody_node_candidates,
+	    m_vertex_subsampler->PerformSubsample(onbody_vertex, onbody_node_candidates, onbody_node_ind
             0.7f * Constants::kNodeRadius, stream);
 
     SynchronizeArray<float4> farbody_node_candidates;
+    SynchronizeArray<float4> farbody_node_ind;
 	farbody_node_candidates.AllocateBuffer(Constants::kMaxSubsampleFrom * Constants::kMaxNumNodes);
+    farbody_node_ind.AllocateBuffer(Constants::kMaxSubsampleFrom * Constants::kMaxNumNodes);
 	if (farbody_vertex.Size() > 0)
-   		m_vertex_subsampler->PerformSubsample(farbody_vertex, farbody_node_candidates,
+   		m_vertex_subsampler->PerformSubsample(farbody_vertex, farbody_node_candidates, farbody_node_ind
             2.0f * Constants::kNodeRadius, stream);
 
     auto h_onbody = onbody_node_candidates.HostArray();
     auto h_farbody = farbody_node_candidates.HostArray();
     std::copy(h_farbody.begin(), h_farbody.end(), std::back_inserter(h_onbody));
 
-	WarpFieldUpdater::InitializeReferenceNodesAndSE3FromCandidates(*warp_field, h_onbody, stream);
+    auto h_onbody_ind = onbody_node_ind.HostArray();
+    auto h_farbody_ind = farbody_node_ind.HostArray();
+    std::copy(h_farbody_ind.begin(), h_farbody_ind.end(), std::back_inserter(h_onbody_ind));
+
+	WarpFieldUpdater::InitializeReferenceNodesAndSE3FromCandidates(*warp_field, h_onbody, h_farbody_ind, stream);
 }

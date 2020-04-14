@@ -32,6 +32,7 @@ namespace surfelwarp {
 		static void InitializeReferenceNodesAndSE3FromCandidates(
 			WarpField& warp_field,
 			const std::vector<float4>& node_candidate,
+            const std::vector<int> &ind_surf_array,
 			cudaStream_t stream = 0
 		);
 		

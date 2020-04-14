@@ -24,47 +24,34 @@ namespace surfelwarp { namespace device {
 	}
 
 	__device__ __forceinline__ void computeSmoothJtResidual(
-		const NodeGraphSmoothTerm2Jacobian& term2jacobian,
-		unsigned node_idx, unsigned typed_term,
-		float jt_residual[jt_dot_blk_size]
-	) {
-		const ushort2 node_ij = term2jacobian.node_graph[typed_term];
-		const auto Ti_xj = term2jacobian.Ti_xj[typed_term];
-		const auto Tj_xj = term2jacobian.Tj_xj[typed_term];
-		const auto validity = term2jacobian.validity_indicator[typed_term];
-		const bool is_node_i = (node_idx == node_ij.x);
-		if(validity == 0) {
+                const NodeGraphSmoothTerm2Jacobian& term2jacobian,
+                unsigned node_idx, unsigned typed_term,
+                float jt_residual[jt_dot_blk_size]
+    ) {
+        const ushort2 node_ij = term2jacobian.node_graph[typed_term];
+        const auto Ti_xj = term2jacobian.Ti_xj[typed_term];
+        const auto Tj_xj = term2jacobian.Tj_xj[typed_term];
+        const auto validity = term2jacobian.validity_indicator[typed_term];
+        const bool is_node_i = (node_idx == node_ij.x);
+        if(validity == 0) {
 #pragma unroll
-			for(auto i = 0; i < jt_dot_blk_size; i++)
-				jt_residual[i] = 0.0f;
-			return;
-		}
-		computeSmoothTermJtResidual(Ti_xj, Tj_xj, is_node_i, jt_residual);
-	}
+            for(auto i = 0; i < jt_dot_blk_size; i++)
+                jt_residual[i] = 0.0f;
+            return;
+        }
+        computeSmoothTermJtResidual(Ti_xj, Tj_xj, is_node_i, jt_residual);
+    }
 
 
-	__device__ __forceinline__ void computeSmoothJtResidualOnline(
-		const NodeGraphSmoothTerm2Jacobian& term2jacobian,
-		unsigned node_idx, unsigned typed_term,
-		float jt_residual[jt_dot_blk_size]
-	) {
-		const ushort2 node_ij = term2jacobian.node_graph[typed_term];
-		const auto xi = term2jacobian.reference_node_coords[node_ij.x];
-		const auto xj = term2jacobian.reference_node_coords[node_ij.y];
-		DualQuaternion dq_i = term2jacobian.node_se3[node_ij.x];
-		DualQuaternion dq_j = term2jacobian.node_se3[node_ij.y];
-		const auto validity = term2jacobian.validity_indicator[typed_term];
-		const mat34 Ti = dq_i.se3_matrix();
-		const mat34 Tj = dq_j.se3_matrix();
-		const bool is_node_i = (node_idx == node_ij.x);
-		if(validity == 0) {
-#pragma unroll
-			for(auto i = 0; i < jt_dot_blk_size; i++)
-				jt_residual[i] = 0.0f;
-			return;
-		}
-		computeSmoothTermJtResidual(xj, Ti, Tj, is_node_i, jt_residual);
-	}
+    __device__ __forceinline__ void computeBindJtResidual(
+            const NodeGraphBindTerm2Jacobian& term2jacobian,
+            unsigned node_idx, unsigned typed_term,
+            float jt_residual[jt_dot_blk_size]
+    ) {
+        const auto Ti_xi = term2jacobian.Ti_xi[typed_term];
+        const auto xi = term2jacobian.xi[typed_term];
+        computeBindTermJtResidual(Ti_xi, xi, jt_residual);
+    }
 
 	__device__ __forceinline__ void computePoint2PointJtResidual(
 		const Point2PointICPTerm2Jacobian& term2jacobian,
@@ -167,12 +154,19 @@ namespace surfelwarp { namespace device {
 					}
 					break;
 				case TermType::Smooth:
-					{
-						float term_jt_residual[6] = {0};
-						computeSmoothJtResidual(term2jacobian.smooth_term, node_idx, typed_term_idx, term_jt_residual);
-						fillScalarJtResidualToSharedBlock(term_jt_residual, shared_blks, constants.SmoothSquared());
-					}
-					break;
+                    {
+                        float term_jt_residual[6] = {0};
+                        computeSmoothJtResidual(term2jacobian.smooth_term, node_idx, typed_term_idx, term_jt_residual);
+                        fillScalarJtResidualToSharedBlock(term_jt_residual, shared_blks, constants.SmoothSquared());
+                    }
+                        break;
+				case TermType::Bind:
+                    {
+                        float term_jt_residual[6] = {0};
+                        computeBindJtResidual(term2jacobian.bind_term, node_idx, typed_term_idx, term_jt_residual);
+                        fillScalarJtResidualToSharedBlock(term_jt_residual, shared_blks, constants.BindSquared());
+                    }
+                        break;
 				case TermType::Foreground:
 					{
 						float term_jt_residual[6] = {0};
@@ -275,6 +269,13 @@ namespace surfelwarp { namespace device {
 					computeSmoothJtResidual(term2jacobian.smooth_term, node_idx, typed_term_idx, term_jt_residual);
 					fillScalarJtResidualToSharedBlock(term_jt_residual, shared_blks, constants.SmoothSquared());
 				}
+				break;
+                case TermType::Bind:
+                {
+                    float term_jt_residual[6] = { 0 };
+                    computeBindJtResidual(term2jacobian.bind_term, node_idx, typed_term_idx, term_jt_residual);
+                    fillScalarJtResidualToSharedBlock(term_jt_residual, shared_blks, constants.BindSquared());
+                }
 				break;
 				case TermType::Foreground:
 				{

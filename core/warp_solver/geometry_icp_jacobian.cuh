@@ -411,6 +411,18 @@ namespace surfelwarp { namespace device {
 		}
 	}
 
+	__host__ __device__ __forceinline__ void computeBindTermJacobian(
+    		const float3& Ti_xi, const float3& xi,
+    		TwistGradientOfScalarCost* twist_gradient//[3]
+    	) {
+            twist_gradient[0].rotation = make_float3(0.0f, Ti_xi.z, -Ti_xi.y);
+            twist_gradient[0].translation = make_float3(1.0f, 0.0f, 0.0f);
+            twist_gradient[1].rotation = make_float3(-Ti_xi.z, 0.0f, Ti_xi.x);
+            twist_gradient[1].translation = make_float3(0.0f, 1.0f, 0.0f);
+            twist_gradient[2].rotation = make_float3(Ti_xi.y, -Ti_xi.x, 0.0f);
+            twist_gradient[2].translation = make_float3(0.0f, 0.0f, 1.0f);
+    	}
+
 	__host__ __device__ __forceinline__ void computeSmoothTermJacobian(
 		const float4& xj4,
 		const mat34& Ti, const mat34& Tj,
@@ -465,6 +477,26 @@ namespace surfelwarp { namespace device {
 			*((float3*)(&jt_residual[3])) += residual * make_float3(0.0f, 0.0f, -1.0f);
 		}
 	}
+
+    __host__ __device__ __forceinline__ void computeBindTermJtResidual(
+        const float3& Ti_xi,
+        const float3& xi,
+        float jt_residual[6]
+    ) {
+        //First iter: assign
+        float residual = Ti_xi.x - xi.x;
+        *((float3*)(&jt_residual[0])) = residual * make_float3(0.0f, Ti_xi.z, -Ti_xi.y);
+        *((float3*)(&jt_residual[3])) = residual * make_float3(1.0f, 0.0f, 0.0f);
+
+        //Next iters: plus
+        residual = Ti_xi.y - xi.y;
+        *((float3*)(&jt_residual[0])) += residual * make_float3(-Ti_xi.z, 0.0f, Ti_xi.x);
+        *((float3*)(&jt_residual[3])) += residual * make_float3(0.0f, 1.0f, 0.0f);
+
+        residual = Ti_xi.z - xi.z;
+        *((float3*)(&jt_residual[0])) += residual * make_float3(Ti_xi.y, -Ti_xi.x, 0.0f);
+        *((float3*)(&jt_residual[3])) += residual * make_float3(0.0f, 0.0f, 1.0f);
+    }
 
 	__host__ __device__ __forceinline__ void computeSmoothTermJtResidual(
 		const float4& xj4,

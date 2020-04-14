@@ -4,9 +4,6 @@
 
 #pragma once
 
-//Use materialized jtj?
-#define USE_MATERIALIZED_JTJ
-
 //Use dense solver maps
 #define USE_DENSE_SOLVER_MAPS
 

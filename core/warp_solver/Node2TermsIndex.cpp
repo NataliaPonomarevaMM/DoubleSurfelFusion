@@ -7,6 +7,7 @@
 #include "common/Constants.h"
 #include "core/warp_solver/Node2TermsIndex.h"
 #include "core/warp_solver/term_offset_types.h"
+#include "Node2TermsIndex.h"
 #include <vector>
 
 surfelwarp::Node2TermsIndex::Node2TermsIndex() {
@@ -43,11 +44,13 @@ void surfelwarp::Node2TermsIndex::ReleaseBuffer() {
 void surfelwarp::Node2TermsIndex::SetInputs(
 	DeviceArrayView<ushort4> dense_image_knn,
 	DeviceArrayView<ushort2> node_graph, unsigned num_nodes,
+    DeviceArrayView<int> node_bind_index,
 	DeviceArrayView<ushort4> foreground_mask_knn,
 	DeviceArrayView<ushort4> sparse_feature_knn
 ) {
 	m_term2node.dense_image_knn = dense_image_knn;
 	m_term2node.node_graph = node_graph;
+    m_term2node.node_bind_index = node_bind_index;
 	m_term2node.foreground_mask_knn = foreground_mask_knn;
 	m_term2node.sparse_feature_knn = sparse_feature_knn;
 	m_num_nodes = num_nodes;
@@ -57,6 +60,7 @@ void surfelwarp::Node2TermsIndex::SetInputs(
 		m_term_offset,
 		dense_image_knn,
 		node_graph,
+		node_bind_index,
 		foreground_mask_knn,
 		sparse_feature_knn
 	);
@@ -65,9 +69,6 @@ void surfelwarp::Node2TermsIndex::SetInputs(
 void surfelwarp::Node2TermsIndex::BuildIndex(cudaStream_t stream) {
 	buildTermKeyValue(stream);
 	sortCompactTermIndex(stream);
-	
-	//Debug check: seems correct
-	//compactedIndexSanityCheck();
 }
 
 
@@ -78,6 +79,7 @@ unsigned surfelwarp::Node2TermsIndex::NumTerms() const
 	return 
 	  m_term2node.dense_image_knn.Size()
 	+ m_term2node.node_graph.Size()
+	+ m_term2node.node_bind_index.Size()
 	+ m_term2node.foreground_mask_knn.Size() 
 	+ m_term2node.sparse_feature_knn.Size();
 }
@@ -88,77 +90,7 @@ unsigned surfelwarp::Node2TermsIndex::NumKeyValuePairs() const
 	return 
 	  m_term2node.dense_image_knn.Size() * 4
 	+ m_term2node.node_graph.Size() * 2
+	+ m_term2node.node_bind_index.Size()
 	+ m_term2node.foreground_mask_knn.Size() * 4 
 	+ m_term2node.sparse_feature_knn.Size() * 4;
-}
-
-/* A sanity check function for node2term maps
- */
-void surfelwarp::Node2TermsIndex::compactedIndexSanityCheck() {
-	LOG(INFO) << "Check of compacted node2term index";
-	//First download the input data
-	std::vector<ushort2> h_node_graph;
-	std::vector<ushort4> h_dense_depth_knn, h_density_map_knn, h_foreground_mask_knn, h_sparse_feature_knn;
-	m_term2node.dense_image_knn.Download(h_dense_depth_knn);
-	m_term2node.node_graph.Download(h_node_graph);
-	m_term2node.foreground_mask_knn.Download(h_foreground_mask_knn);
-	m_term2node.sparse_feature_knn.Download(h_sparse_feature_knn);
-	
-	//Next download the maps
-	const auto map = GetNode2TermMap();
-	std::vector<unsigned> map_offset, map_term_index;
-	map.offset.Download(map_offset);
-	map.term_index.Download(map_term_index);
-	
-	//Basic check
-	SURFELWARP_CHECK_EQ(map_offset.size(), m_num_nodes + 1);
-	SURFELWARP_CHECK_EQ(map_term_index.size(), NumKeyValuePairs());
-	
-	//Check each nodes
-	for(auto node_idx = 0; node_idx < m_num_nodes; node_idx++)
-	{
-		for(auto j = map_offset[node_idx]; j < map_offset[node_idx + 1]; j++) {
-			const auto term_idx = map_term_index[j];
-			TermType type;
-			unsigned in_type_offset;
-			query_typed_index(term_idx, map.term_offset, type, in_type_offset);
-			switch (type) {
-			case TermType::DenseImage:
-				check4NNTermIndex(in_type_offset, h_dense_depth_knn, node_idx);
-				break;
-			case TermType::Smooth:
-				checkSmoothTermIndex(in_type_offset, h_node_graph, node_idx);
-				break;
-			/*case TermType::DensityMap:
-				check4NNTermIndex(in_type_offset, h_density_map_knn, node_idx);
-				break;*/
-			case TermType::Foreground:
-				check4NNTermIndex(in_type_offset, h_foreground_mask_knn, node_idx);
-				break;
-			case TermType::Feature:
-				check4NNTermIndex(in_type_offset, h_sparse_feature_knn, node_idx);
-				break;
-			case TermType::Invalid:
-			default:
-				LOG(FATAL) << "Can not be invalid types";
-			}
-		}
-	}
-	
-	LOG(INFO) << "Check done! Seems correct!";
-}
-
-void surfelwarp::Node2TermsIndex::check4NNTermIndex(
-	int typed_term_idx,
-	const std::vector<ushort4> &knn_vec,
-	unsigned short node_idx
-) {
-	const auto knn = knn_vec[typed_term_idx];
-	SURFELWARP_CHECK(node_idx == knn.x || node_idx == knn.y || node_idx == knn.z || node_idx == knn.w);
-}
-
-void surfelwarp::Node2TermsIndex::checkSmoothTermIndex(int smooth_term_idx, const std::vector<ushort2>& node_graph, unsigned short node_idx)
-{
-	const auto node_pair = node_graph[smooth_term_idx];
-	SURFELWARP_CHECK(node_idx == node_pair.x || node_idx == node_pair.y);
 }

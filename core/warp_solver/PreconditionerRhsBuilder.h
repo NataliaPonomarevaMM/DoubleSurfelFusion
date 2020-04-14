@@ -37,6 +37,7 @@ namespace surfelwarp {
 			Node2TermMap node2term,
 			DenseDepthTerm2Jacobian dense_depth_term,
 			NodeGraphSmoothTerm2Jacobian smooth_term,
+            NodeGraphBindTerm2Jacobian bind_term,
 			DensityMapTerm2Jacobian density_map_term = DensityMapTerm2Jacobian(),
 			ForegroundMaskTerm2Jacobian foreground_mask_term = ForegroundMaskTerm2Jacobian(),
 			Point2PointICPTerm2Jacobian sparse_feature_term = Point2PointICPTerm2Jacobian(),

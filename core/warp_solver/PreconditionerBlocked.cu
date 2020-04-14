@@ -3,7 +3,7 @@
 #include "core/warp_solver/PreconditionerRhsBuilder.h"
 #include "core/warp_solver/Node2TermsIndex.h"
 #include "core/warp_solver/term_offset_types.h"
-#include "core/warp_solver/geometry_term2jacobian.h"
+#include "geometry_icp_jacobian.cuh"
 #include "core/warp_solver/PenaltyConstants.h"
 #include <device_launch_parameters.h>
 
@@ -53,30 +53,15 @@ namespace surfelwarp { namespace device {
 		computeSmoothTermJacobian(Ti_xj, Tj_xj, is_node_i, (TwistGradientOfScalarCost*)channelled_jacobian);
 	}
 
-
-	__device__ __forceinline__ void computeJtJDiagonalJacobianOnline(
-		const NodeGraphSmoothTerm2Jacobian& term2jacobian,
-		unsigned node_idx, unsigned typed_term,
-		float* channelled_jacobian
-	) {
-		const ushort2 node_ij = term2jacobian.node_graph[typed_term];
-		const auto xi = term2jacobian.reference_node_coords[node_ij.x];
-		const auto xj = term2jacobian.reference_node_coords[node_ij.y];
-		DualQuaternion dq_i = term2jacobian.node_se3[node_ij.x];
-		DualQuaternion dq_j = term2jacobian.node_se3[node_ij.y];
-		const auto validity = term2jacobian.validity_indicator[typed_term];
-		const mat34 Ti = dq_i.se3_matrix();
-		const mat34 Tj = dq_j.se3_matrix();
-		const bool is_node_i = (node_idx == node_ij.x);
-		if(validity == 0) {
-#pragma unroll
-			for(auto i = 0; i < 18; i++)
-				channelled_jacobian[i] = 0.0f;
-			return;
-		}
-		computeSmoothTermJacobian(xj, Ti, Tj, is_node_i, (TwistGradientOfScalarCost*)channelled_jacobian);
-	}
-	
+    __device__ __forceinline__ void computeJtJDiagonalJacobian(
+            const NodeGraphBindTerm2Jacobian& term2jacobian,
+            unsigned node_idx, unsigned typed_term,
+            float* channelled_jacobian
+    ) {
+        const auto Ti_xi = term2jacobian.Ti_xi[typed_term];
+        const auto xi = term2jacobian.xi[typed_term];
+        computeBindTermJacobian(Ti_xi, xi, (TwistGradientOfScalarCost*)channelled_jacobian);
+    }
 
 	__device__ __forceinline__ void computeJtJDiagonalJacobian(
 		const Point2PointICPTerm2Jacobian& term2jacobian,
@@ -150,7 +135,6 @@ namespace surfelwarp { namespace device {
 			shared_jtj_blks[6 * jac_row + 4][threadIdx.x] = weight_square * jacobian[4] * jacobian[jac_row];
 			shared_jtj_blks[6 * jac_row + 5][threadIdx.x] = weight_square * jacobian[5] * jacobian[jac_row];
 		}
-		
 
 		//The next 2 iterations: plus
 		for(auto channel = 1; channel < 3; channel++) {
@@ -227,6 +211,13 @@ namespace surfelwarp { namespace device {
 						fillChannelledJtJToSharedBlock(channelled_jacobian, shared_blks, constants.SmoothSquared());
 					}
 					break;
+                case TermType::Bind:
+                {
+                    float channelled_jacobian[18] = {0};
+                    computeJtJDiagonalJacobian(term2jacobian.bind_term, node_idx, typed_term_idx, channelled_jacobian);
+                    fillChannelledJtJToSharedBlock(channelled_jacobian, shared_blks, constants.BindSquared());
+                }
+                break;
 				case TermType::Foreground:
 					{
 						float jacobian[6] = {0};
@@ -334,6 +325,13 @@ namespace surfelwarp { namespace device {
 					fillChannelledJtJToSharedBlock(channelled_jacobian, shared_blks, constants.SmoothSquared());
 				}
 				break;
+                case TermType::Bind:
+                {
+                    float channelled_jacobian[18] = { 0 };
+                    computeJtJDiagonalJacobian(term2jacobian.bind_term, node_idx, typed_term_idx, channelled_jacobian);
+                    fillChannelledJtJToSharedBlock(channelled_jacobian, shared_blks, constants.BindSquared());
+                }
+                break;
 				case TermType::Foreground:
 				{
 					float jacobian[6] = { 0 };

@@ -45,20 +45,6 @@ void surfelwarp::JtJMaterializer::SetInputs(
 
 void surfelwarp::JtJMaterializer::BuildMaterializedJtJNondiagonalBlocks(cudaStream_t stream) {
 	computeNonDiagonalBlocks(stream);
-	//computeNonDiagonalBlocksNoSync(stream);
-
-	//TODO: instead of leaving dead code, either change this function w/ optional argument/flag check or
-	// use a separate set of functions / child class w/ overriding member functions for performance measurement
-    //TODO: get rid of PCL usage in favor of std::chrono or the like
-	//Performance test
-	/*{
-		pcl::ScopeTime time("Performance test of Compute JtJ");
-		for(auto i = 0; i < 1000; i++) {
-			computeNonDiagonalBlocks(stream);
-			//computeNonDiagonalBlocksNoSync(stream);
-		}
-		cudaStreamSynchronize(stream);
-	}*/
 }
 
 

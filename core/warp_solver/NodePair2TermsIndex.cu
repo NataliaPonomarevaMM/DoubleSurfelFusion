@@ -220,11 +220,6 @@ void surfelwarp::NodePair2TermsIndex::sortCompactTermIndex(cudaStream_t stream) 
 	cudaSafeCall(cudaStreamSynchronize(stream));
 	cudaSafeCall(cudaGetLastError());
 #endif
-	
-	//Debug
-	//std::vector<unsigned> sorted_key;
-	//m_nodepair_keys.ArrayView().Download(sorted_key);
-	//std::cout << sorted_key[sorted_key.size() - 1] << std::endl;
 }
 
 void surfelwarp::NodePair2TermsIndex::buildSymmetricCompactedIndex(cudaStream_t stream) {

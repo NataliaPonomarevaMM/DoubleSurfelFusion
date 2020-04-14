@@ -24,6 +24,8 @@ namespace surfelwarp {
 		//The sync members that might be accessed on host
 		SynchronizeArray<float4> m_reference_node_coords;
 		SynchronizeArray<DualQuaternion> m_node_se3;
+		// index of node in surfel array
+        SynchronizeArray<int> m_node_index;
 		
 		//These property will be uploaded from host to device
 		DeviceBufferArray<ushort4> m_node_knn;
@@ -79,6 +81,7 @@ namespace surfelwarp {
 			DeviceArrayView<DualQuaternion> node_se3;
 			DeviceArrayView<float4> reference_node_coords;
 			DeviceArrayView<ushort2> node_graph;
+            DeviceArrayView<int> node_index;
 		};
 		SolverInput SolverAccess() const;
 		
