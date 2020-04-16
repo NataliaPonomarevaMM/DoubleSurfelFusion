@@ -44,8 +44,7 @@ void surfelwarp::WarpSolver::AllocateBuffer() {
     m_preconditioner_rhs_builder->AllocateBuffer();
     m_jtj_materializer = std::make_shared<JtJMaterializer>();
 	m_jtj_materializer->AllocateBuffer();
-    const auto max_matrix_size = 6 * Constants::kMaxNumNodes;
-    m_pcg_solver = std::make_shared<BlockPCG<6>>(max_matrix_size);
+    allocatePCGSolverBuffer();
 	
 	//Init the stream for cuda
 	initSolverStream();
@@ -65,6 +64,7 @@ void surfelwarp::WarpSolver::ReleaseBuffer() {
     m_nodepair2term_index->ReleaseBuffer();
     m_preconditioner_rhs_builder->ReleaseBuffer();
     m_jtj_materializer->ReleaseBuffer();
+    releasePCGSolverBuffer();
 }
 
 //The input interface

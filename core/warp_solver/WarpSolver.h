@@ -141,9 +141,14 @@ namespace surfelwarp {
         JtJMaterializer::Ptr m_jtj_materializer;
 		void SetPreconditionerBuilderAndJtJApplierInput();
 
-		/* The pcg solver*/
-		BlockPCG<6>::Ptr m_pcg_solver;
-		void SolvePCGMaterialized(int pcg_iterations = 10);
+        /* The pcg solver*/
+    private:
+        BlockPCG<6>::Ptr m_pcg_solver;
+        void allocatePCGSolverBuffer();
+        void releasePCGSolverBuffer();
+    public:
+        void UpdatePCGSolverStream(cudaStream_t stream);
+        void SolvePCGMaterialized(int pcg_iterations = 10);
 
 		/* The solver interface for streamed solver*/
 		cudaStream_t m_solver_stream[4];

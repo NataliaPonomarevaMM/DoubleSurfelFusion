@@ -8,12 +8,12 @@ void surfelwarp::WarpSolver::initSolverStream() {
 	cudaSafeCall(cudaStreamCreate(&m_solver_stream[3]));
 	
 	//Hand in the stream to pcg solver
-    m_pcg_solver->UpdateCudaStream(m_solver_stream[0]);
+    UpdatePCGSolverStream(m_solver_stream[0]);
 }
 
 void surfelwarp::WarpSolver::releaseSolverStream() {
 	//Update 0 stream to pcg solver
-    m_pcg_solver->UpdateCudaStream(0);
+    UpdatePCGSolverStream(0);
 
 	cudaSafeCall(cudaStreamDestroy(m_solver_stream[0]));
 	cudaSafeCall(cudaStreamDestroy(m_solver_stream[1]));

@@ -472,6 +472,27 @@ void surfelwarp::Visualizer::SaveColoredPointCloud(const std::vector<float4> poi
     file_output.close();
 }
 
+void surfelwarp::Visualizer::SaveColoredPointCloud(const std::vector<float3> points,
+                                                   const uchar3 color,
+                                                   const std::string &path) {
+    std::ofstream file_output;
+    file_output.open(path);
+
+    file_output << "COFF" << std::endl;
+    file_output << points.size() << " " << 0 << " " << 0 << std::endl;
+    for (auto i = 0; i < points.size(); i++) {
+        const auto point = points[i];
+        file_output << point.x
+                    << " " << point.y
+                    << " " << point.z
+                    << " " << color.x / 255.f
+                    << " " << color.y / 255.f
+                    << " " << color.z / 255.f
+                    << std::endl;
+    }
+    file_output.close();
+}
+
 void surfelwarp::Visualizer::SaveMatchedCloudPair(
         cudaTextureObject_t cloud_1,
         const DeviceArray<float4> &cloud_2,
