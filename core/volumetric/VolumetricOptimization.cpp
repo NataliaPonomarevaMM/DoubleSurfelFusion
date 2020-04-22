@@ -1,8 +1,7 @@
-#include "VolumetricOptimization.h"
-#include "common/ConfigParser.h"
-
 #include <iostream>
 #include <Eigen/Dense>
+
+#include "core/volumetric/VolumetricOptimization.h"
 
 void surfelwarp::VolumetricOptimization::Solve(
         SMPL::Ptr smpl_handler,
@@ -29,6 +28,6 @@ void surfelwarp::VolumetricOptimization::Solve(
         auto x = lscg.solve(b);
         std::cout << "#iterations:     " << lscg.iterations() << std::endl;
         std::cout << "estimated error: " << lscg.error()      << std::endl;
-        std::cout << x << std::endl;
+        std::cout << "new x:" << x << std::endl;
     }
 }

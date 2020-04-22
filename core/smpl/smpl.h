@@ -64,7 +64,7 @@ namespace surfelwarp {
                 DeviceArray<float> &dtheta,
                 cudaStream_t stream);
         void countNormals(cudaStream_t stream);
-        void CameraTransform(mat34 world2camera);
+        void CameraTransform(mat34 world2camera, cudaStream_t stream);
         void lbsModel(mat34 world2camera, cudaStream_t stream);
         void markVertices(
                 const DeviceArrayView<float4>& live_vertex,

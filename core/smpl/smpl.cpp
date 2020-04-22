@@ -112,6 +112,7 @@ namespace surfelwarp {
         transform(poseRotation, joints, globalTransformations, stream);
 	    skinning(globalTransformations, stream);
         countNormals(stream);
+        CameraTransform(world2camera, stream);
     }
 
     SMPL::SolverInput SMPL::SolverAccess(

@@ -87,7 +87,7 @@ void surfelwarp::SurfelWarpSerial::ProcessFirstFrame() {
 	const auto reference_vertex = m_surfel_geometry[m_updated_geometry_index]->ReferenceVertexConfidence();
     const auto live_vertex = m_surfel_geometry[m_updated_geometry_index]->LiveVertexConfidence();
     DeviceArray<float4> onbody, farbody;
-    m_smpl_model->Split(live_vertex, reference_vertex, m_frame_idx, onbody, farbody);
+    m_smpl_model->Split(live_vertex, reference_vertex, m_frame_idx, onbody, farbody, m_camera.GetWorld2Camera());
 	m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(
 		DeviceArrayView<float4>(onbody), DeviceArrayView<float4>(farbody), m_warp_field);
 	
@@ -146,7 +146,7 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 
 	//SMPL info
 	const auto live_vertex = m_surfel_geometry[m_updated_geometry_index]->LiveVertexConfidence();
-	const auto solver_smpl = m_smpl_model->SolverAccess(live_vertex, m_frame_idx);
+	const auto solver_smpl = m_smpl_model->SolverAccess(live_vertex, m_frame_idx, m_camera.GetWorld2Camera());
 	
 	//Pass the input to warp solver
 	m_warp_solver->SetSolverInputs(
@@ -220,7 +220,7 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 		const auto reference_vertex = m_surfel_geometry[fused_geometry_idx]->ReferenceVertexConfidence();
         const auto live_vertex = m_surfel_geometry[fused_geometry_idx]->LiveVertexConfidence();
         DeviceArray<float4> onbody, farbody;
-        m_smpl_model->Split(live_vertex, reference_vertex, m_frame_idx, onbody, farbody);
+        m_smpl_model->Split(live_vertex, reference_vertex, m_frame_idx, onbody, farbody, m_camera.GetWorld2Camera());
         m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(
                 DeviceArrayView<float4>(onbody), DeviceArrayView<float4>(farbody), m_warp_field);
 
@@ -351,9 +351,6 @@ void surfelwarp::SurfelWarpSerial::saveCorrespondedCloud(
 		cloud_1_name, cloud_2_name
 	);
     Visualizer::SaveSMPLCloud(smpl_vertices, face_ind, smpl_cloud_name);
-	
-	//Also save the reference point cloud
-//	Visualizer::SavePointCloud(geometry.reference_vertex_confid.ArrayView(), (save_dir / "reference.off").string());
 }
 
 

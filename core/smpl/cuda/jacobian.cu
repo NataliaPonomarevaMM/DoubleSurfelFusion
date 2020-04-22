@@ -38,7 +38,7 @@ namespace surfelwarp {
                 const float4 *live_vertex,
                 const float4 *live_normal,
                 const float3 *smpl_vertices,
-                DeviceArrayView<ushort2> pairs,
+                const ushort2 *pairs,
                 const float *beta0,
                 const float *beta,
                 const float *theta0,
@@ -77,8 +77,10 @@ namespace surfelwarp {
 
             const auto cur_pair = pairs[idx];
             const auto smpl = smpl_vertices[cur_pair.x];
-            const auto lv = live_vertex[cur_pair.y];
-            const auto ln = live_normal[cur_pair.y];
+            const auto lv4 = live_vertex[cur_pair.y];
+            const auto ln4 = live_normal[cur_pair.y];
+            const auto lv = make_float3(lv4.x, lv4.y, lv4.z);
+            const auto ln = make_float3(ln4.x, ln4.y, ln4.z);
 
             residual[idx] = dot(ln, smpl - lv);
             // beta
@@ -86,7 +88,7 @@ namespace surfelwarp {
                 gradient[idx * 82 + i] = 0;
             // theta
             for (int i = 10; i < 82; i++)
-                gradient[idx * 82 + i] = dot(ln, smpl) * restshape[];
+                gradient[idx * 82 + i] = dot(ln, smpl);
         }
     }
 }
@@ -118,7 +120,7 @@ void surfelwarp::SMPL::ComputeJacobian(
     transform(poseRotation, joints, globalTransformations, stream);
     skinning(globalTransformations, stream);
     jacobian_beta(globalTransformations, dbeta, stream);
-    CameraTransform(world2camera);
+    CameraTransform(world2camera, stream);
 
     auto residual = DeviceArray<float>(6892);
     auto gradient = DeviceArray<float>(6892 * 82);
@@ -132,8 +134,8 @@ void surfelwarp::SMPL::ComputeJacobian(
     device::computeJacobianKernel<<<grid, blk, 0, stream>>>(
             live_vertex.RawPtr(),
             live_normal.RawPtr(),
-            m_smpl_vertices.RawPtr(),
-            m_pairs,
+            m_smpl_vertices.ptr(),
+            pairs.ptr(),
             m__beta.ptr(),
             beta0.RawPtr(),
             m__theta.ptr(),
