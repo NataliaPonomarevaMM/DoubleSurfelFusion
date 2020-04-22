@@ -277,14 +277,20 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 			m_reference_knn_skinner->PerformSkinningUpdate(skinner_geometry, skinner_warpfield, prev_node_size);
 		}
 	}
-	//Unmap attributes
+
+	//After integration do volumetric optimization
+	auto v = m_surfel_geometry[fused_geometry_idx]->LiveVertexConfidence();
+	auto n = m_surfel_geometry[fused_geometry_idx]->LiveNormalRadius();
+	auto cam = m_camera.GetWorld2Camera();
+    m_volumetric_optimization->Solve(m_smpl_model, v, n, cam);
+
+    //Unmap attributes
 	m_renderer->UnmapFusionMapsFromCuda();
 	m_renderer->UnmapSurfelGeometryFromCuda(0);
 	m_renderer->UnmapSurfelGeometryFromCuda(1);
 	
 	//Debug save
 	if(offline_save) {
-		std::cout << "7\n";
 		const auto with_recent = draw_recent || use_reinit;
 		const auto& save_dir = createOrGetDataDirectory(m_frame_idx);
 		saveCameraObservations(observation, save_dir);

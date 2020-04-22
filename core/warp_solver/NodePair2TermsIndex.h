@@ -112,8 +112,6 @@ namespace surfelwarp {
 	private:
 		DeviceBufferArray<unsigned> m_blkrow_offset_array;
 		DeviceBufferArray<unsigned> m_blkrow_length_array;
-		void blockRowOffsetSanityCheck();
-		void blockRowLengthSanityCheck();
 	public:
 		void computeBlockRowLength(cudaStream_t stream = 0);
 		
@@ -124,8 +122,6 @@ namespace surfelwarp {
 		DeviceBufferArray<unsigned> m_binlength_array;
 		DeviceBufferArray<unsigned> m_binnonzeros_prefixsum;
 		DeviceBufferArray<int> m_binblocked_csr_rowptr;
-		void binLengthNonzerosSanityCheck();
-		void binBlockCSRRowPtrSanityCheck();
 	public:
 		void computeBinLength(cudaStream_t stream = 0);
 		void computeBinBlockCSRRowPtr(cudaStream_t stream = 0);
@@ -135,7 +131,6 @@ namespace surfelwarp {
 		 */
 	private:
 		DeviceBufferArray<int> m_binblocked_csr_colptr;
-		void binBlockCSRColumnPtrSanityCheck();
 	public:
 		void nullifyBinBlockCSRColumePtr(cudaStream_t stream = 0);
 		void computeBinBlockCSRColumnPtr(cudaStream_t stream = 0);

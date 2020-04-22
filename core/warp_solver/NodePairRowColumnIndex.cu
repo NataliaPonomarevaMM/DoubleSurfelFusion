@@ -175,10 +175,6 @@ void surfelwarp::NodePair2TermsIndex::computeBlockRowLength(cudaStream_t stream)
 	cudaSafeCall(cudaStreamSynchronize(stream));
 	cudaSafeCall(cudaGetLastError());
 #endif
-	
-	//Debug sanity check
-	//blockRowOffsetSanityCheck();
-	//blockRowLengthSanityCheck();
 }
 
 

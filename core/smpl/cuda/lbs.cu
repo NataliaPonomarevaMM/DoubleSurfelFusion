@@ -20,7 +20,7 @@ namespace surfelwarp {
                 return;
 
             int vertexnum = smpl_vertices.size;
-	    float3 refv = make_float3(reference_vertex[i].x, reference_vertex[i].y, reference_vertex[i].z);
+	        float3 refv = make_float3(reference_vertex[i].x, reference_vertex[i].y, reference_vertex[i].z);
             for (int j = 0; j < vertexnum; j++) {
                 dist[i * vertexnum + j] = norm(refv - smpl_vertices[j]);
                 if (dist[i * vertexnum + j] <= max_dist)
@@ -138,10 +138,11 @@ namespace surfelwarp {
             const int frame_idx,
             DeviceArray<float4>& onbody_points,
             DeviceArray<float4>& farbody_points,
+            mat34 world2camera,
             cudaStream_t stream
     ) {
         if (m_vert_frame != frame_idx) {
-            lbsModel(stream);
+            lbsModel(world2camera, stream);
             markVertices(live_vertex, stream);
             m_vert_frame = frame_idx;
         }
@@ -154,10 +155,11 @@ namespace surfelwarp {
     void SMPL::countKnn(
             const DeviceArrayView<float4>& live_vertex,
             const int frame_idx,
+            mat34 world2camera,
             cudaStream_t stream
     ) {
         if (m_vert_frame != frame_idx) {
-            lbsModel(stream);
+            lbsModel(world2camera, stream);
             markVertices(live_vertex, stream);
             m_vert_frame = frame_idx;
         }

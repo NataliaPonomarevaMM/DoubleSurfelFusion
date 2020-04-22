@@ -33,6 +33,18 @@ namespace surfelwarp {
                 return;
             normal[ind] = normalized(normal[ind]);
         }
+
+        __global__ void transform(
+                PtrSz<float3> normal,
+                PtrSz<float3> vertex,
+                const mat34 world2camera
+        ) {
+            const auto ind = threadIdx.x + blockDim.x * blockIdx.x;
+            if (ind >= normal.size)
+                return;
+            vertex[ind] = world2camera.rot * vertex[ind] + world2camera.trans;
+            normal[ind] = world2camera.rot * normal[ind];
+        }
     }
 
     void SMPL::countNormals(
@@ -49,6 +61,12 @@ namespace surfelwarp {
         blk = dim3(128);
         grid = dim3(divUp(VERTEX_NUM, blk.x));
         device::normalize_normal<<<grid, blk,0,stream>>>(m_smpl_normals);
+    }
+
+    void SMPL::CameraTransform(mat34 world2camera) {
+        dim3 blk = dim3(128);
+        dim3 grid = dim3(divUp(VERTEX_NUM, blk.x));
+        device::transform<<<grid, blk,0,stream>>>(m_smpl_normals, m_smpl_vertices, world2camera);
     }
 }
 

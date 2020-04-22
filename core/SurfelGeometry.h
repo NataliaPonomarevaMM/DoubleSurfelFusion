@@ -94,6 +94,7 @@ namespace surfelwarp {
 		 */
         DeviceArrayView<float4> ReferenceVertexConfidence() const { return m_reference_vertex_confid.ArrayView(); }
         DeviceArrayView<float4> LiveVertexConfidence() const { return m_live_vertex_confid.ArrayView(); }
+        DeviceArrayView<float4> LiveNormalRadius() const { return m_live_normal_radius.ArrayView(); }
 		DeviceArrayView<ushort4> SurfelKNNArray() const { return m_surfel_knn.ArrayView(); }
 
 		

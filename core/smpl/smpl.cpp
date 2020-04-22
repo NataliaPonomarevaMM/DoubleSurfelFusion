@@ -95,7 +95,7 @@ namespace surfelwarp {
         m__beta.upload(data_arr + 75, 10);
     }
 
-    void SMPL::lbsModel(cudaStream_t stream) {
+    void SMPL::lbsModel(mat34 world2camera, cudaStream_t stream) {
 	    auto poseRotation = DeviceArray<float>(JOINT_NUM * 9);
         auto restPoseRotation = DeviceArray<float>(JOINT_NUM * 9);
         auto poseBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
@@ -111,17 +111,17 @@ namespace surfelwarp {
         regressJoints(shapeBlendShape, poseBlendShape, joints, stream);
         transform(poseRotation, joints, globalTransformations, stream);
 	    skinning(globalTransformations, stream);
-
         countNormals(stream);
     }
 
     SMPL::SolverInput SMPL::SolverAccess(
             const DeviceArrayView<float4>& live_vertex,
             const int frame_idx,
+            mat34 world2camera,
             cudaStream_t stream)
     {
         if (m_knn_frame != frame_idx) {
-            countKnn(live_vertex, frame_idx, stream);
+            countKnn(live_vertex, frame_idx, world2camera, stream);
             m_knn_frame = frame_idx;
         }
 

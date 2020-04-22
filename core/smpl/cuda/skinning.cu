@@ -37,6 +37,40 @@ namespace surfelwarp {
             }
             vertices[j] = make_float3(vert[0], vert[1], vert[2]);
         }
+
+        __global__ void jacobian(
+                const PtrSz<const float> restShape,
+                const PtrSz<const float> transformation,
+                const PtrSz<const float> weights,
+                const int jointnum,
+                const int shapebasisdim,
+                PtrSz<float3> vertices
+        ) {
+            int j = blockIdx.x;
+            int i = threadIdx.x;
+
+            if (j + 1 >= vertices.size)
+                return;
+
+            float coeffs[16] = {0};
+            for (int k = 0; k < 4; k++)
+                for (int l = 0; l < 4; l++)
+                    for (int t = 0; t < jointnum; t++)
+                        coeffs[k * 4 + l] += weights[j * jointnum + t] * transformation[t * 16 + k * 4 + l];
+
+            float homoW = coeffs[15];
+            for (int t = 0; t < 3; t++)
+                homoW += coeffs[12 + t] * restShape[(j * 3 + t) * shapebasisdim + i];
+
+            float vert[3];
+            for (int k = 0; k < 3; k++) {
+                vert[k] = coeffs[k * 4 + 3];
+                for (int t = 0; t < 3; t++)
+                    vert[k] += coeffs[k * 4 + t] * restShape[(j * 3 + t) * shapebasisdim + i];
+                vert[k] /= homoW;
+            }
+            vertices[j * shapebasisdim + i] = make_float3(vert[0], vert[1], vert[2]);
+        }
     }
 
     void SMPL::skinning(
@@ -45,5 +79,14 @@ namespace surfelwarp {
     ) {
         device::Skinning<<<VERTEX_NUM,1,0,stream>>>(m_restShape, transformation,  m__weights,
                JOINT_NUM, m_smpl_vertices);
+    }
+
+    void SMPL::jacobian_beta(
+            const DeviceArray<float> &transformation,
+            DeviceArray<float> &dbeta,
+            cudaStream_t stream
+    ) {
+        device::jacobian<<<VERTEX_NUM,SHAPE_BASIS_DIM,0,stream>>>(m__shapeBlendBasis, transformation,  m__weights,
+                JOINT_NUM, SHAPE_BASIS_DIM, dbeta);
     }
 }

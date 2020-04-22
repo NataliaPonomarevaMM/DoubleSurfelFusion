@@ -22,6 +22,7 @@
 #include "core/warp_solver/WarpSolver.h"
 #include "core/warp_solver/RigidSolver.h"
 #include "core/smpl/smpl.h"
+#include "core/volumetric/VolumetricOptimization.h"
 
 #include <boost/filesystem.hpp>
 
@@ -35,6 +36,8 @@ namespace surfelwarp {
 
 		//SMPL Model
 		SMPL::Ptr m_smpl_model;
+		//Volumetric optimization
+		VolumetricOptimization::Ptr m_volumetric_optimization;
 
 		//The surfel geometry and their updater
 		SurfelGeometry::Ptr m_surfel_geometry[2];

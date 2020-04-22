@@ -64,14 +64,6 @@ namespace surfelwarp {
 			SurfelGeometry::SolverInput geometry_input,
 			WarpField::SolverInput warpfield_input,
             SMPL::SolverInput smpl_input,
-			const Matrix4f& world2camera
-		);
-		void SetSolverInputs(
-			CameraObservation observation,
-			Renderer::SolverMaps rendered_maps,
-			SurfelGeometry::SolverInput geometry_input,
-			WarpField::SolverInput warpfield_input,
-            SMPL::SolverInput smpl_input,
 			const mat34& world2camera
 		);
 		

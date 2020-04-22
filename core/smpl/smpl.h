@@ -59,14 +59,20 @@ namespace surfelwarp {
         void skinning(
                 const DeviceArray<float> &transformation,
                 cudaStream_t stream);
+        void jacobian_beta(
+                const DeviceArray<float> &transformation,
+                DeviceArray<float> &dtheta,
+                cudaStream_t stream);
         void countNormals(cudaStream_t stream);
-        void lbsModel(cudaStream_t stream);
+        void CameraTransform(mat34 world2camera);
+        void lbsModel(mat34 world2camera, cudaStream_t stream);
         void markVertices(
                 const DeviceArrayView<float4>& live_vertex,
                 cudaStream_t stream);
         void countKnn(
                 const DeviceArrayView<float4>& live_vertex,
                 const int frame_idx,
+                mat34 world2camera,
                 cudaStream_t stream);
     public:
         using Ptr = std::shared_ptr<SMPL>;
@@ -79,6 +85,7 @@ namespace surfelwarp {
                 const int frame_idx,
                 DeviceArray<float4>& onbody_points,
                 DeviceArray<float4>& farbody_points,
+                mat34 world2camera,
                 cudaStream_t stream = 0);
 
         struct SolverInput {
@@ -91,9 +98,29 @@ namespace surfelwarp {
         SolverInput SolverAccess(
                 const DeviceArrayView<float4>& live_vertex,
                 const int frame_idx,
+                mat34 world2camera,
                 cudaStream_t stream = 0);
         DeviceArray<float3> GetVertices() const { return m_smpl_vertices; };
         DeviceArray<int> GetFaceIndices() const { return m__faceIndices; };
+
+        DeviceArrayView<float> GetBeta() const {
+            return DeviceArrayView<float>(m__beta);
+        }
+
+        DeviceArrayView<float> GetTheta() const {
+            return DeviceArrayView<float>(m__theta);
+        }
+
+        void ComputeJacobian(
+                DeviceArrayView<float4> &live_vertex,
+                DeviceArrayView<float4> &live_normal,
+                DeviceArrayView<float> &beta0,
+                DeviceArrayView<float> &theta0,
+                float *r,
+                float *j,
+                mat34 world2camera,
+                cudaStream_t stream
+        );
     };
 } // namespace smpl
 #endif // SMPL_H

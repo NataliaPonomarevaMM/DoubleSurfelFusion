@@ -87,25 +87,6 @@ void surfelwarp::WarpSolver::SetSolverInputs(
     m_iteration_data.SetWarpFieldInitialValue(warpfield_input.node_se3);
 }
 
-
-void surfelwarp::WarpSolver::SetSolverInputs(
-        CameraObservation observation,
-        Renderer::SolverMaps rendered_maps,
-        SurfelGeometry::SolverInput geometry_input,
-        WarpField::SolverInput warpfield_input,
-        SMPL::SolverInput smpl_input,
-        const Matrix4f& world2camera
-) {
-    SetSolverInputs(
-            observation,
-            rendered_maps,
-            geometry_input,
-            warpfield_input,
-            smpl_input,
-            mat34(world2camera)
-    );
-}
-
 /* The buffer and method for correspondence finder
  */
 void surfelwarp::WarpSolver::setDenseDepthHandlerFullInput() {
