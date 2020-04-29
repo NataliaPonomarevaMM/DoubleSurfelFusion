@@ -40,8 +40,8 @@ namespace surfelwarp {
 		 * Of course, this operation requires sync
 		 */
 	private:
-		VoxelSubsampler::Ptr m_vertex_subsampler;
-		SynchronizeArray<float4> m_node_candidate;
+		VoxelSubsampler::Ptr m_onbody_vertex_subsampler;
+        VoxelSubsampler::Ptr m_farbody_vertex_subsampler;
 	};
 	
 }

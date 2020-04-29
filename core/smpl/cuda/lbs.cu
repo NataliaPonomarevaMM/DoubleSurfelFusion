@@ -4,6 +4,7 @@
 #include "core/smpl/smpl.h"
 #include "common/Constants.h"
 #include "math/vector_ops.hpp"
+#include "common/algorithm_types.h"
 #include <device_launch_parameters.h>
 
 namespace surfelwarp {
@@ -13,24 +14,30 @@ namespace surfelwarp {
                 const PtrSz<const float3> smpl_vertices,
                 const int max_dist,
                 PtrSz<float> dist,
-                PtrSz<bool> marked
+                PtrSz<unsigned> marked
         ) {
             int i = blockIdx.x; // reference vertex size
+            int j = threadIdx.x;
             if (i >= reference_vertex.Size())
                 return;
 
             int vertexnum = smpl_vertices.size;
+            int count = 27; // 6890 / 256
+            marked[i] = 0;
+
 	        float3 refv = make_float3(reference_vertex[i].x, reference_vertex[i].y, reference_vertex[i].z);
-            for (int j = 0; j < vertexnum; j++) {
-                dist[i * vertexnum + j] = norm(refv - smpl_vertices[j]);
-                if (dist[i * vertexnum + j] <= max_dist)
-                    marked[i] = true;
+            for (int k = 0; k < count; k++) {
+                if (j * 256 + k < vertexnum) {
+                    dist[i * vertexnum + j * 256 + k] = squared_norm(refv - smpl_vertices[j * 256 + k]);
+                    if (dist[i * vertexnum + j * 256 + k] <= max_dist)
+                        marked[i] = 1;
+                }
             }
         }
 
         __global__ void copy_body_nodes(
                 const DeviceArrayView<float4> reference_vertex,
-                const PtrSz<const bool> on_body,
+                const PtrSz<const unsigned> on_body,
                 PtrSz<float4> onbody_points,
                 PtrSz<float4> farbody_points
         ) {
@@ -45,7 +52,7 @@ namespace surfelwarp {
 
         __global__ void fill_index(
                 const DeviceArrayView<float4> reference_vertex,
-                const PtrSz<const bool> on_body,
+                const PtrSz<const unsigned> on_body,
                 PtrSz<int> knn_ind,
                 PtrSz<int> reverse_ind
         ) {
@@ -63,9 +70,10 @@ namespace surfelwarp {
                 const PtrSz<const float> dist,
                 const PtrSz<const int> knn_ind,
                 const int vertexnum,
-                PtrSz<ushort4> knn
+                ushort4* knn,
+                float4* weights
         ) {
-            int i = blockIdx.x; // num
+            const auto i = threadIdx.x + blockDim.x * blockIdx.x;
             if (i >= knn_ind.size)
                 return;
 
@@ -92,20 +100,7 @@ namespace surfelwarp {
                         continue;
                     }
             knn[i] = make_ushort4(ind[0], ind[1], ind[2], ind[3]);
-        }
 
-        __global__ void calculate_weights(
-                const PtrSz<const float> dist,
-                const PtrSz<const ushort4> knn,
-                const PtrSz<const int> knn_ind,
-                const int vertexnum,
-                PtrSz<float4> weights
-        ) {
-            int i = blockIdx.x; // num 
-            if (i >= knn_ind.size)
-                return;
-
-            int dist_ind = knn_ind[i] * vertexnum;
             float4 weight;
             weight.x = __expf(-dist[dist_ind + knn[i].x]/ (2 * d_node_radius_square));
             weight.y = __expf(-dist[dist_ind + knn[i].y] / (2 * d_node_radius_square));
@@ -120,16 +115,30 @@ namespace surfelwarp {
             cudaStream_t stream
     ) {
         m_dist = DeviceArray<float>(live_vertex.Size() * VERTEX_NUM);
-        m_marked_vertices = DeviceArray<bool>(live_vertex.Size());
+        m_marked_vertices = DeviceArray<unsigned>(live_vertex.Size());
 
-        device::count_distance<<<live_vertex.Size(),1,0,stream>>>(live_vertex, m_smpl_vertices,
+        device::count_distance<<<live_vertex.Size(),256,0,stream>>>(live_vertex, m_smpl_vertices,
                 2.8f * Constants::kNodeRadius, m_dist, m_marked_vertices);
-        bool *host_array = (bool *)malloc(sizeof(bool) * m_marked_vertices.size());
-        m_marked_vertices.download(host_array);
-        m_num_marked = 0;
-        for (int i = 0; i < m_marked_vertices.size(); i++)
-            if (host_array[i])
-                m_num_marked++;
+
+        //Prefix sum
+        PrefixSum pref_sum;
+        pref_sum.InclusiveSum(m_marked_vertices, stream);
+        const auto& prefixsum_label = pref_sum.valid_prefixsum_array;
+        cudaSafeCall(cudaMemcpyAsync(
+                &m_num_marked,
+                prefixsum_label.ptr() + prefixsum_label.size() - 1,
+                sizeof(unsigned),
+                cudaMemcpyDeviceToHost,
+                stream
+        ));
+        cudaStreamSynchronize(stream);
+        cudaError_t error = cudaGetLastError();
+        if(error != cudaSuccess)
+        {
+            // print the CUDA error message and exit
+            printf("CUDA error: %s\n", cudaGetErrorString(error));
+            exit(-1);
+        }
     }
 
     void SMPL::Split(
@@ -171,8 +180,10 @@ namespace surfelwarp {
         m_knn_weight = DeviceArray<float4>(m_num_marked);
 
         //find 4 nearest neighbours
-        device::findKNN<<<m_num_marked,1,0,stream>>>(m_dist, knn_ind, VERTEX_NUM, m_knn);
-        device::calculate_weights<<<m_num_marked,1,0,stream>>>(m_dist, m_knn, knn_ind,
-                VERTEX_NUM, m_knn_weight);
+        if (m_num_marked > 0) {
+            dim3 blk(64);
+            dim3 grid(divUp(m_num_marked, blk.x));
+            device::findKNN<<<grid,blk,0,stream>>>(m_dist, knn_ind, VERTEX_NUM, m_knn.ptr(), m_knn_weight.ptr());
+        }
     }
 }

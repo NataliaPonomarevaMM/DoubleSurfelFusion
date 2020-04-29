@@ -183,6 +183,7 @@ void surfelwarp::WarpFieldUpdater::InitializeReferenceNodesAndSE3FromCandidates(
 	//Do no touch other elements
 	warp_field.m_reference_node_coords.ClearArray();
 	warp_field.m_node_se3.ClearArray();
+    warp_field.m_node_index.ClearArray();
 	
 	//Collect elements
 	const float sample_distance_square = (Constants::kNodeSamplingRadius) * (Constants::kNodeSamplingRadius);

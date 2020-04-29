@@ -120,6 +120,12 @@ namespace surfelwarp {
 		return make_float3(vec.x + scalar, vec.y + scalar, vec.z + scalar);
 	}
 
+    __host__ __device__ __forceinline__ float3
+    operator/(const float3& vec, const float& scalar)
+    {
+        return make_float3(vec.x / scalar, vec.y / scalar, vec.z / scalar);
+    }
+
 	__host__ __device__ __forceinline__ float3
 		operator+(const float& scalar, const float3& vec)
 	{

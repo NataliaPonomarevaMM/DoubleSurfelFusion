@@ -3,11 +3,12 @@
 #include <nlohmann/json.hpp>
 #include "core/smpl/smpl.h"
 #include "core/smpl/def.h"
+#include "math/vector_ops.hpp"
 
 namespace surfelwarp {
     void moveModel() {
         nlohmann::json model; // JSON object represents.
-        std::ifstream file("/home/nponomareva/DoubleFusion/data/smpl_female.json");
+        std::ifstream file("/home/nponomareva/data/smpl_model.json");
         file >> model;
 
         auto shapeBlendBasis = model["shape_blend_shapes"].get<std::vector<std::vector<std::vector<float>>>>();
@@ -33,7 +34,7 @@ namespace surfelwarp {
         for (int i = 0; i < VERTEX_NUM; i++)
             for (int j = 0; j < 3; j++)
                 for (int k = 0; k < SHAPE_BASIS_DIM; k++)
-                    shape[i * 3 * SHAPE_BASIS_DIM + j * SHAPE_BASIS_DIM + k] = shapeBlendBasis[i][j][k];
+                    shape[k * VERTEX_NUM * 3 + i * 3 + j] = shapeBlendBasis[i][j][k];
         for (int i = 0; i < VERTEX_NUM; i++)
             for (int j = 0; j < 3; j++)
                 templ[i * 3 + j] = templateRestShape[i][j];
@@ -51,7 +52,7 @@ namespace surfelwarp {
                 face_ind[i * 3 + j] = faceind[i][j];
 
         nlohmann::json model2; // JSON object represents.
-        std::ofstream file2("/home/nponomareva/DoubleFusion/data/smpl_female2.json");
+        std::ofstream file2("/home/nponomareva/data/smpl_model2.json");
         model2["shape_blend_shapes"] = shape;
         model2["pose_blend_shapes"] = pose;
         model2["vertices_template"] = templ;
@@ -63,9 +64,8 @@ namespace surfelwarp {
     }
 
     SMPL::SMPL() {
-//        moveModel();
-
-        std::string modelPath = "/home/nponomareva/DoubleFusion/data/smpl_female2.json";
+ //       moveModel();
+        std::string modelPath = "/home/nponomareva/data/smpl_model2.json";
         std::string hmrPath = "/home/nponomareva/data/hmr_results/hmr_data.json";
 
         nlohmann::json model; // JSON object represents.
@@ -90,9 +90,10 @@ namespace surfelwarp {
         nlohmann::json tb_data; // JSON object represents.
         std::ifstream file2(hmrPath);
         file2 >> tb_data;
-        float *data_arr = tb_data["arr"].get<std::vector<std::vector<float>>>()[0].data();
-        m__theta.upload(data_arr + 3, 72);
-        m__beta.upload(data_arr + 75, 10);
+        auto beta = tb_data["beta"].get<std::vector<float>>();
+        auto theta = tb_data["theta"].get<std::vector<float>>();
+        m__theta.upload(theta.data(), 72);
+        m__beta.upload(beta.data(), 10);
     }
 
     void SMPL::lbsModel(mat34 world2camera, cudaStream_t stream) {
@@ -112,6 +113,7 @@ namespace surfelwarp {
         transform(poseRotation, joints, globalTransformations, stream);
 	    skinning(globalTransformations, stream);
         countNormals(stream);
+        //CameraTransform(world2camera, stream);
     }
 
     SMPL::SolverInput SMPL::SolverAccess(

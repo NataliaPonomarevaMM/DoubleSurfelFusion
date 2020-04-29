@@ -88,31 +88,37 @@ void surfelwarp::NodeGraphBindHandler::BuildTerm2Jacobian(cudaStream_t stream) {
         if (smpl_idx != -1)
             count++;
     }
-    m_index = DeviceArray<int>(count);
-    device::fill_index<<<1,1,0,stream>>>(m_node_index, m_onbody.RawPtr(), m_index);
 
+    m_index = DeviceArray<int>(count);
     Ti_xi_.ResizeArrayOrException(count);
     xi_.ResizeArrayOrException(count);
 
-    dim3 blk(128);
-    dim3 grid(divUp(m_reference_node_coords.Size(), blk.x));
-    device::forwardWarpBinderNodeKernel<<<grid, blk, 0, stream>>>(
-            m_reference_node_coords,
-            m_node_se3.RawPtr(),
-            m_node_index.RawPtr(),
-            m_onbody.RawPtr(),
-            m_smpl_vertices.RawPtr(),
-            m_knn.RawPtr(),
-            m_knn_weight.RawPtr(),
-            Ti_xi_.Ptr(), xi_.Ptr(),
-            m_index
-    );
+    if (count > 0) {
+        device::fill_index << < 1, 1, 0, stream >> > (m_node_index, m_onbody.RawPtr(), m_index);
+        dim3 blk(128);
+        dim3 grid(divUp(m_reference_node_coords.Size(), blk.x));
+        device::forwardWarpBinderNodeKernel << < grid, blk, 0, stream >> > (
+                m_reference_node_coords,
+                        m_node_se3.RawPtr(),
+                        m_node_index.RawPtr(),
+                        m_onbody.RawPtr(),
+                        m_smpl_vertices.RawPtr(),
+                        m_knn.RawPtr(),
+                        m_knn_weight.RawPtr(),
+                        Ti_xi_.Ptr(), xi_.Ptr(),
+                        m_index
+        );
+    }
 
-    //Sync and check error
-#if defined(CUDA_DEBUG_SYNC_CHECK)
-    cudaSafeCall(cudaStreamSynchronize(stream));
-	cudaSafeCall(cudaGetLastError());
-#endif
+    cudaStreamSynchronize(stream);
+    // check for error
+    cudaError_t error = cudaGetLastError();
+    if(error != cudaSuccess)
+    {
+        // print the CUDA error message and exit
+        printf("1)CUDA error: %s\n", cudaGetErrorString(error));
+        exit(-1);
+    }
 }
 
 surfelwarp::NodeGraphBindTerm2Jacobian surfelwarp::NodeGraphBindHandler::Term2JacobianMap() const

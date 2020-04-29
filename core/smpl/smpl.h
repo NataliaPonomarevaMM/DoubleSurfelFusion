@@ -31,8 +31,8 @@ namespace surfelwarp {
         DeviceArray<float3> m_smpl_vertices;
         DeviceArray<float3> m_smpl_normals;
         DeviceArray<float> m_dist;
-        int m_num_marked;
-        DeviceArray<bool> m_marked_vertices;
+        unsigned m_num_marked = 0;
+        DeviceArray<unsigned> m_marked_vertices;
         int m_knn_frame = -1;
         DeviceArray<ushort4> m_knn;
         DeviceArray<float4> m_knn_weight;
@@ -64,8 +64,6 @@ namespace surfelwarp {
                 DeviceArray<float> &dtheta,
                 cudaStream_t stream);
         void countNormals(cudaStream_t stream);
-        void CameraTransform(mat34 world2camera);
-        void lbsModel(mat34 world2camera, cudaStream_t stream);
         void markVertices(
                 const DeviceArrayView<float4>& live_vertex,
                 cudaStream_t stream);
@@ -78,6 +76,9 @@ namespace surfelwarp {
         using Ptr = std::shared_ptr<SMPL>;
         SMPL();
         SURFELWARP_NO_COPY_ASSIGN_MOVE(SMPL);
+
+        void lbsModel(mat34 world2camera, cudaStream_t stream);
+        void CameraTransform(mat34 world2camera, cudaStream_t stream);
 
         void Split(
                 const DeviceArrayView<float4>& live_vertex,
@@ -119,7 +120,7 @@ namespace surfelwarp {
                 float *r,
                 float *j,
                 mat34 world2camera,
-                cudaStream_t stream
+                cudaStream_t stream = 0
         );
     };
 } // namespace smpl

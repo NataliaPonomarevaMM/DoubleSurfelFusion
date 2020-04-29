@@ -15,10 +15,13 @@ namespace surfelwarp {
         ) {
             int j = blockIdx.x;
 
-            if (j + 1 >= vertices.size)
+            if (j >= vertices.size)
                 return;
 
             float coeffs[16] = {0};
+            for (int i = 0; i < 16; i++)
+                coeffs[i] = 0;
+
             for (int k = 0; k < 4; k++)
                 for (int l = 0; l < 4; l++)
                     for (int t = 0; t < jointnum; t++)
@@ -49,10 +52,13 @@ namespace surfelwarp {
             int j = blockIdx.x;
             int i = threadIdx.x;
 
-            if (j + 1 >= vertices.size)
+            if (j >= vertices.size)
                 return;
 
             float coeffs[16] = {0};
+            for (int i = 0; i < 16; i++)
+                coeffs[i] = 0;
+
             for (int k = 0; k < 4; k++)
                 for (int l = 0; l < 4; l++)
                     for (int t = 0; t < jointnum; t++)

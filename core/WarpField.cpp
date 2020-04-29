@@ -25,6 +25,7 @@ void surfelwarp::WarpField::allocateBuffer(size_t max_num_nodes) {
 	//The buffer on both host and device
 	m_reference_node_coords.AllocateBuffer(max_num_nodes);
 	m_node_se3.AllocateBuffer(max_num_nodes);
+    m_node_index.AllocateBuffer(max_num_nodes);
 	m_node_knn.AllocateBuffer(max_num_nodes);
 	m_node_knn_weight.AllocateBuffer(max_num_nodes);
 	

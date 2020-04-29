@@ -3,15 +3,17 @@ file(GLOB CORE_GEOMETRY_SRC geometry/*.h geometry/*.cpp geometry/*.cu geometry/*
 file(GLOB CORE_SOLVER_SRC warp_solver/*.h warp_solver/*.cpp warp_solver/*.hpp warp_solver/*.cu warp_solver/*.cuh)
 file(GLOB CORE_SRC *.h *.cuh *.hpp *.cu *.cpp *.c)
 file(GLOB CORE_SMPL_SRC smpl/*.h "*.cpp" smpl/*.cpp smpl/cuda/*.cu)
+file(GLOB CORE_VOLUMETRIC_SRC volumetric/*.h volumetric/*.cpp)
 
 source_group("src" FILES ${CORE_SRC})
 source_group("render" FILES ${CORE_RENDER_SRC})
 source_group("geometry" FILES ${CORE_GEOMETRY_SRC})
 source_group("warp_solver" FILES ${CORE_SOLVER_SRC})
 source_group("smpl" FILES ${CORE_SMPL_SRC})
+source_group("volumetric" FILES ${CORE_VOLUMETRIC_SRC})
 
 #Add core library
-cuda_add_library(core_lib ${CORE_SRC} ${CORE_RENDER_SRC} ${CORE_GEOMETRY_SRC} ${CORE_SOLVER_SRC} ${CORE_SMPL_SRC})
+cuda_add_library(core_lib ${CORE_SRC} ${CORE_RENDER_SRC} ${CORE_GEOMETRY_SRC} ${CORE_SOLVER_SRC} ${CORE_SMPL_SRC} ${CORE_VOLUMETRIC_SRC})
 target_link_libraries(core_lib ${OpenCV_LIBRARIES})
 target_link_libraries(core_lib ${CUDA_CUBLAS_LIBRARIES})
 target_link_libraries(core_lib common_lib)

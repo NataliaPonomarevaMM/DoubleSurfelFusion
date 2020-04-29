@@ -15,6 +15,13 @@
 #include <thread>
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <cstdlib>
+#include <chrono>
+
+using mcs = std::chrono::microseconds;
+using ms = std::chrono::milliseconds;
+using clk = std::chrono::system_clock;
+
 
 surfelwarp::SurfelWarpSerial::SurfelWarpSerial() {
     //The config is assumed to be updated
@@ -64,6 +71,19 @@ surfelwarp::SurfelWarpSerial::SurfelWarpSerial() {
 	//The frame index
 	m_frame_idx = config.start_frame_idx();
 	m_reinit_frame_idx = m_frame_idx;
+	m_smpl_model->lbsModel(m_camera.GetCamera2World(), 0);
+	const auto& save_dir = createOrGetDataDirectory(m_frame_idx);
+	const std::string smpl_cloud_name = (save_dir / "smpl.obj").string();
+	Visualizer::SaveSMPLCloud(m_smpl_model->GetVertices(),
+	m_smpl_model->GetFaceIndices(), smpl_cloud_name);
+	std::cout << "saved\n";
+
+//	auto v = m_smpl_model->GetVertices();
+//	std::vector<float3> vert;
+//	v.download(vert);
+//	std::cout << "size: " << vert.size() << "\n";
+//    std::cout << vert[6888].x << " " << vert[6888].y << " " << vert[6888].z << "\n";
+//	std::cout << vert[6889].x << " " << vert[6889].y << " " << vert[6889].z << "\n";
 }
 
 surfelwarp::SurfelWarpSerial::~SurfelWarpSerial() {
@@ -82,15 +102,16 @@ void surfelwarp::SurfelWarpSerial::ProcessFirstFrame() {
 	m_updated_geometry_index = 0;
 	m_renderer->MapSurfelGeometryToCuda(m_updated_geometry_index);
 	m_geometry_initializer->InitFromObservationSerial(*m_surfel_geometry[m_updated_geometry_index], surfel_array);
-	
+
 	//Build the reference vertex and SE3 for the warp field
 	const auto reference_vertex = m_surfel_geometry[m_updated_geometry_index]->ReferenceVertexConfidence();
     const auto live_vertex = m_surfel_geometry[m_updated_geometry_index]->LiveVertexConfidence();
     DeviceArray<float4> onbody, farbody;
-    m_smpl_model->Split(live_vertex, reference_vertex, m_frame_idx, onbody, farbody);
-	m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(
+    m_smpl_model->Split(live_vertex, reference_vertex, m_frame_idx, onbody, farbody, m_camera.GetWorld2Camera());
+
+    m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(
 		DeviceArrayView<float4>(onbody), DeviceArrayView<float4>(farbody), m_warp_field);
-	
+
 	//Build the index and skinning nodes and surfels
 	m_warp_field->BuildNodeGraph();
 	
@@ -146,8 +167,13 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 
 	//SMPL info
 	const auto live_vertex = m_surfel_geometry[m_updated_geometry_index]->LiveVertexConfidence();
-	const auto solver_smpl = m_smpl_model->SolverAccess(live_vertex, m_frame_idx);
-	
+
+    auto begin = clk::now();
+    const auto solver_smpl = m_smpl_model->SolverAccess(live_vertex, m_frame_idx, m_camera.GetWorld2Camera());
+    auto end = clk::now();
+    auto time = std::chrono::duration_cast<ms>(end - begin);
+    std::cout << ") smpl time " << (double)time.count() << std::endl;
+
 	//Pass the input to warp solver
 	m_warp_solver->SetSolverInputs(
 		observation,
@@ -161,7 +187,6 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 	//Solve it
 	m_warp_solver->SolveStreamed();
 	const auto solved_se3 = m_warp_solver->SolvedNodeSE3();
-	
 
 	//Do a forward warp and build index
 	m_warp_field->UpdateHostDeviceNodeSE3NoSync(solved_se3);
@@ -192,7 +217,7 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 
 	//The geometry index that both fusion and reinit will write to, if no writing then keep current geometry index
 	auto fused_geometry_idx = m_updated_geometry_index;
-	
+
 	//Depends on should do reinit or integrate
 	if(use_reinit) {
 		//First setup the idx
@@ -220,7 +245,7 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 		const auto reference_vertex = m_surfel_geometry[fused_geometry_idx]->ReferenceVertexConfidence();
         const auto live_vertex = m_surfel_geometry[fused_geometry_idx]->LiveVertexConfidence();
         DeviceArray<float4> onbody, farbody;
-        m_smpl_model->Split(live_vertex, reference_vertex, m_frame_idx, onbody, farbody);
+        m_smpl_model->Split(live_vertex, reference_vertex, m_frame_idx, onbody, farbody, m_camera.GetWorld2Camera());
         m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(
                 DeviceArrayView<float4>(onbody), DeviceArrayView<float4>(farbody), m_warp_field);
 
@@ -257,6 +282,7 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 		m_live_geometry_updater->ProcessFusionStreamed(num_remaining_surfel, num_appended_surfel);
 		//Do a inverse warping
 		SurfelNodeDeformer::InverseWarpSurfels(*m_warp_field, *m_surfel_geometry[fused_geometry_idx], solved_se3);
+
 		//Extend the warp field reference nodes and SE3
 		const auto prev_node_size = m_warp_field->CheckAndGetNodeSize();
 		const float4* appended_vertex_ptr = m_surfel_geometry[fused_geometry_idx]->ReferenceVertexConfidence().RawPtr() + num_remaining_surfel;
@@ -264,7 +290,6 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 		const ushort4* appended_knn_ptr = m_surfel_geometry[fused_geometry_idx]->SurfelKNNArray().RawPtr() + num_remaining_surfel;
 		DeviceArrayView<ushort4> appended_surfel_knn(appended_knn_ptr, num_appended_surfel);
 		m_warpfield_extender->ExtendReferenceNodesAndSE3Sync(appended_vertex_view, appended_surfel_knn, m_warp_field);
-		
 		//Rebuild the node graph
 		m_warp_field->BuildNodeGraph();
 		//Update skinning
@@ -279,16 +304,16 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 	}
 
 	//After integration do volumetric optimization
-	auto v = m_surfel_geometry[fused_geometry_idx]->LiveVertexConfidence();
-	auto n = m_surfel_geometry[fused_geometry_idx]->LiveNormalRadius();
-	auto cam = m_camera.GetWorld2Camera();
-    m_volumetric_optimization->Solve(m_smpl_model, v, n, cam);
+//	auto v = m_surfel_geometry[fused_geometry_idx]->LiveVertexConfidence();
+//	auto n = m_surfel_geometry[fused_geometry_idx]->LiveNormalRadius();
+//	auto cam = m_camera.GetWorld2Camera();
+//    m_volumetric_optimization->Solve(m_smpl_model, v, n, cam);
 
     //Unmap attributes
 	m_renderer->UnmapFusionMapsFromCuda();
 	m_renderer->UnmapSurfelGeometryFromCuda(0);
 	m_renderer->UnmapSurfelGeometryFromCuda(1);
-	
+
 	//Debug save
 	if(offline_save) {
 		const auto with_recent = draw_recent || use_reinit;
@@ -306,7 +331,6 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
                               m_smpl_model->GetVertices(),
                               m_smpl_model->GetFaceIndices(), save_dir);
 	}
-	
 	//Update the index
 	m_frame_idx++;
 	m_updated_geometry_index = fused_geometry_idx;
@@ -351,9 +375,6 @@ void surfelwarp::SurfelWarpSerial::saveCorrespondedCloud(
 		cloud_1_name, cloud_2_name
 	);
     Visualizer::SaveSMPLCloud(smpl_vertices, face_ind, smpl_cloud_name);
-	
-	//Also save the reference point cloud
-//	Visualizer::SavePointCloud(geometry.reference_vertex_confid.ArrayView(), (save_dir / "reference.off").string());
 }
 
 

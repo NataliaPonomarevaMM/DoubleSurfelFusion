@@ -63,7 +63,7 @@ namespace surfelwarp {
         device::normalize_normal<<<grid, blk,0,stream>>>(m_smpl_normals);
     }
 
-    void SMPL::CameraTransform(mat34 world2camera) {
+    void SMPL::CameraTransform(mat34 world2camera, cudaStream_t stream) {
         dim3 blk = dim3(128);
         dim3 grid = dim3(divUp(VERTEX_NUM, blk.x));
         device::transform<<<grid, blk,0,stream>>>(m_smpl_normals, m_smpl_vertices, world2camera);

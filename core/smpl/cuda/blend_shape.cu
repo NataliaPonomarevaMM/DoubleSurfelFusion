@@ -3,6 +3,7 @@
 #include "core/smpl/smpl.h"
 #include "common/common_types.h"
 #include <device_launch_parameters.h>
+#include "math/vector_ops.hpp"
 
 namespace surfelwarp {
     namespace device {
@@ -11,46 +12,47 @@ namespace surfelwarp {
                 PtrSz<float> poseRotation,
                 PtrSz<float> restPoseRotation
         ) {
-	    const auto idx = threadIdx.x + blockDim.x * blockIdx.x;
+            const auto idx = threadIdx.x + blockDim.x * blockIdx.x;
             int ind = idx * 3;
 
-	    if (ind + 2 >= theta.size || ind * 3 + 8 >= poseRotation.size)
-		return;
-            float norm = std::sqrt(
-                    theta[ind] * theta[ind] + theta[ind + 1] * theta[ind + 1] + theta[ind + 2] * theta[ind + 2]);
-            float sin = std::sin(norm);
-            float cos = std::cos(norm);
-            float t0 = theta[ind] / norm;
-            float t1 = theta[ind + 1] / norm;
-            float t2 = theta[ind + 2] / norm; // axes
+            if (ind + 2 >= theta.size || ind * 3 + 8 >= poseRotation.size)
+                return;
+            float3 t = make_float3(theta[ind], theta[ind + 1], theta[ind + 2]) + 1e-8;
+            float n = norm(t);
+            float sin = sinf(n);
+            float cos = cosf(n);
+            t = t / n;
 
             float skew[9];
             skew[0] = 0;
-            skew[1] = -1 * t2;
-            skew[2] = t1;
-            skew[3] = t2;
+            skew[1] = -1 * t.z;
+            skew[2] = t.y;
+            skew[3] = t.z;
             skew[4] = 0;
-            skew[5] = -1 * t0;
-            skew[6] = -1 * t1;
-            skew[7] = t0;
+            skew[5] = -1 * t.x;
+            skew[6] = -1 * t.y;
+            skew[7] = t.x;
             skew[8] = 0;
 
-            ind = ind * 3;
-            for (int p = 0; p < 0; p++)
-                poseRotation[ind + p] = 0;
-            poseRotation[ind] = 1;
-            poseRotation[ind + 4] = 1;
-            poseRotation[ind + 8] = 1;
-            for (int k1 = 0; k1 < 3; k1++)
-                for (int k2 = 0; k2 < 3; k2++) {
-                    int k = k1 * 3 + k2;
-                    poseRotation[ind + k] += skew[k] * sin;
-                    float num = 0;
-                    for (int l = 0; l < 3; l++)
-                        num += skew[k1 * 3 + l] * skew[l * 3 + k2];
-                    poseRotation[ind + k] += (1 - cos) * num;// (N, 24, 3, 3)
-                }
+            float outer[9];
+            outer[0] = t.x * t.x;
+            outer[1] = t.x * t.y;
+            outer[2] = t.x * t.z;
+            outer[3] = t.y * t.x;
+            outer[4] = t.y * t.y;
+            outer[5] = t.y * t.z;
+            outer[6] = t.z * t.x;
+            outer[7] = t.z * t.y;
+            outer[8] = t.z * t.z;
 
+            ind = ind * 3;
+            for (int p = 0; p < 9; p++)
+                poseRotation[ind + p] = 0;
+            poseRotation[ind] = cos;
+            poseRotation[ind + 4] = cos;
+            poseRotation[ind + 8] = cos;
+            for (int k = 0; k < 9; k++)
+                poseRotation[ind + k] += (1 - cos) * outer[k] + sin * skew[k];// (N, 24, 3, 3)
             for (int k = 0; k < 9; k++)
                 restPoseRotation[ind + k] = 0;
             restPoseRotation[ind] = 1;
@@ -86,7 +88,7 @@ namespace surfelwarp {
     		return;
             shapeBlendShape[ind] = 0;
             for (int l = 0; l < shapebasisdim; l++)
-                shapeBlendShape[ind] += beta[l] * shapeBlendBasis[ind * shapebasisdim + l];// (6890, 3)
+                shapeBlendShape[ind] += beta[l] * shapeBlendBasis[l * 6890 * 3 + ind];// (6890, 3)
         }
     }
 

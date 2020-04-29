@@ -102,6 +102,10 @@ namespace surfelwarp { namespace device {
 
 void surfelwarp::VoxelSubsamplerSorting::AllocateBuffer(unsigned max_input_points) {
 	m_point_key.AllocateBuffer(max_input_points);
+    m_point_key_ind.AllocateBuffer(max_input_points);
+    m_point_ind.AllocateBuffer(max_input_points);
+    m_point_ind_sort.AllocateBuffer(max_input_points);
+
 	m_point_key_sort.AllocateBuffer(max_input_points);
 	m_voxel_label.AllocateBuffer(max_input_points);
 	m_voxel_label_prefixsum.AllocateBuffer(max_input_points);
@@ -114,6 +118,8 @@ void surfelwarp::VoxelSubsamplerSorting::AllocateBuffer(unsigned max_input_point
 void surfelwarp::VoxelSubsamplerSorting::ReleaseBuffer() {
 	//Constants::kMaxNumSurfels
 	m_point_key.ReleaseBuffer();
+    m_point_key_ind.ReleaseBuffer();
+    m_point_ind.ReleaseBuffer();
 	m_voxel_label.ReleaseBuffer();
 	
 	//smaller buffer
@@ -141,6 +147,7 @@ void surfelwarp::VoxelSubsamplerSorting::buildVoxelKeyForPoints(
 	//Correct the size of arrays
 	m_point_key.ResizeArrayOrException(points.Size());
     m_point_ind.ResizeArrayOrException(points.Size());
+    m_point_key_ind.ResizeArrayOrException(points.Size());
 	
 	//Call the method
 	dim3 blk(256);
@@ -219,6 +226,7 @@ void surfelwarp::VoxelSubsamplerSorting::collectSynchronizeSubsampledPoint(
 	//Correct the size
 	const auto num_voxels = m_compacted_voxel_key.ArraySize();
 	subsampled_points.ResizeArrayOrException(num_voxels);
+    subsampled_points_ind.ResizeArrayOrException(num_voxels);
 	
 	//Hand on it to device
 	auto subsampled_points_slice = subsampled_points.DeviceArrayReadWrite();
