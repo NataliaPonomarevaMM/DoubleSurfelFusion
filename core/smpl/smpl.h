@@ -102,6 +102,7 @@ namespace surfelwarp {
                 mat34 world2camera,
                 cudaStream_t stream = 0);
         DeviceArray<float3> GetVertices() const { return m_smpl_vertices; };
+        DeviceArray<float3> GetNormals() const { return m_smpl_normals; };
         DeviceArray<int> GetFaceIndices() const { return m__faceIndices; };
 
         DeviceArrayView<float> GetBeta() const {
@@ -123,5 +124,11 @@ namespace surfelwarp {
                 cudaStream_t stream = 0
         );
     };
+
+    void Transform(
+            const DeviceArrayView<float3> &smpl_vertices,
+            const DeviceArrayView<float3> &smpl_normals,
+            const DeviceArrayView<float4> &live_vertex
+    );
 } // namespace smpl
 #endif // SMPL_H

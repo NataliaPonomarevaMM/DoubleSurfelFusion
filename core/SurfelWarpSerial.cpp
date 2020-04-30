@@ -14,7 +14,6 @@
 
 #include <thread>
 #include <fstream>
-#include <nlohmann/json.hpp>
 #include <cstdlib>
 #include <chrono>
 
@@ -77,13 +76,6 @@ surfelwarp::SurfelWarpSerial::SurfelWarpSerial() {
 	Visualizer::SaveSMPLCloud(m_smpl_model->GetVertices(),
 	m_smpl_model->GetFaceIndices(), smpl_cloud_name);
 	std::cout << "saved\n";
-
-//	auto v = m_smpl_model->GetVertices();
-//	std::vector<float3> vert;
-//	v.download(vert);
-//	std::cout << "size: " << vert.size() << "\n";
-//    std::cout << vert[6888].x << " " << vert[6888].y << " " << vert[6888].z << "\n";
-//	std::cout << vert[6889].x << " " << vert[6889].y << " " << vert[6889].z << "\n";
 }
 
 surfelwarp::SurfelWarpSerial::~SurfelWarpSerial() {
@@ -103,9 +95,13 @@ void surfelwarp::SurfelWarpSerial::ProcessFirstFrame() {
 	m_renderer->MapSurfelGeometryToCuda(m_updated_geometry_index);
 	m_geometry_initializer->InitFromObservationSerial(*m_surfel_geometry[m_updated_geometry_index], surfel_array);
 
+	const auto vert = DeviceArrayView<float3>(m_smpl_model->GetVertices());
+	const auto norm = DeviceArrayView<float3>(m_smpl_model->GetNormals());
+    const auto live_vertex = m_surfel_geometry[m_updated_geometry_index]->LiveVertexConfidence();
+	Transform(vert, norm, live_vertex);
+
 	//Build the reference vertex and SE3 for the warp field
 	const auto reference_vertex = m_surfel_geometry[m_updated_geometry_index]->ReferenceVertexConfidence();
-    const auto live_vertex = m_surfel_geometry[m_updated_geometry_index]->LiveVertexConfidence();
     DeviceArray<float4> onbody, farbody;
     m_smpl_model->Split(live_vertex, reference_vertex, m_frame_idx, onbody, farbody, m_camera.GetWorld2Camera());
 
