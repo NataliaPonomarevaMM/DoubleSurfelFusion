@@ -30,8 +30,7 @@ namespace surfelwarp {
         void Solve(
                 SMPL::Ptr smpl_handler,
                 DeviceArrayView<float4> &m_live_vertex,
-                DeviceArrayView<float4> &m_live_normal,
-                mat34 world2camera
+                DeviceArrayView<float4> &m_live_normal
         );
     };
 }

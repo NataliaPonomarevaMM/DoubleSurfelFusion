@@ -29,8 +29,8 @@ namespace surfelwarp {
             if (ind >= joints.size)
                 return;
 
-		    int j = blockIdx.x;
-		    int l = threadIdx.x;
+		    const auto j = ind / 3;
+		    const auto l = ind % 3;
             joints[ind] = 0;
             for (int k = 0; k < vertexnum; k++)
                 joints[ind] += (templateRestShape[k * 3 + l] +
@@ -44,9 +44,11 @@ namespace surfelwarp {
             DeviceArray<float> &joints,
             cudaStream_t stream
     ) {
-        device::RegressJoints1<<<VERTEX_NUM,3,0,stream>>>(m__templateRestShape,
+        dim3 blk(128);
+        dim3 grid(divUp(VERTEX_NUM * 3, blk.x));
+        device::RegressJoints1<<<grid, blk,0,stream>>>(m__templateRestShape,
                 shapeBlendShape, poseBlendShape, m_restShape);
-        device::RegressJoints2<<<JOINT_NUM,3,0,stream>>>(m__templateRestShape,
+        device::RegressJoints2<<<grid, blk,0,stream>>>(m__templateRestShape,
                 shapeBlendShape, m__jointRegressor, VERTEX_NUM, joints);
     }
 }

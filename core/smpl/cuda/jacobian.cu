@@ -8,73 +8,52 @@
 #include "core/smpl/smpl.h"
 #include <device_launch_parameters.h>
 #include <Eigen/Dense>
+#include "common/Constants.h"
 
 namespace surfelwarp {
     namespace device {
-        __global__ void find_closest_live_vertex(
-                const DeviceArrayView<float4> live_vertex,
-                const PtrSz<const float3> smpl_vertices,
-                PtrSz<ushort2> pairs
-        ) {
-            int i = blockIdx.x;
-            if (i >= smpl_vertices.size)
-                return;
-
-            auto first = make_float3(live_vertex[0].x, live_vertex[0].y, live_vertex[0].z);
-            float min_dist = norm(first - smpl_vertices[0]);
-            ushort ind = 0;
-            for (ushort j = 1; j < live_vertex.Size(); j++) {
-                float3 refv = make_float3(live_vertex[j].x, live_vertex[j].y, live_vertex[j].z);
-                float cur_dist = norm(refv - smpl_vertices[i]);
-                if (cur_dist < min_dist) {
-                    min_dist = cur_dist;
-                    ind = j;
-                }
-            }
-            pairs[i] = make_ushort2(i, ind);
-        }
-
-        __global__ void computeJacobianKernel(
-                const float4 *live_vertex,
-                const float4 *live_normal,
-                const float3 *smpl_vertices,
-                const ushort2 *pairs,
+        __global__ void computeJacobianKernel1(
                 const float *beta0,
                 const float *beta,
                 const float *theta0,
                 const float *theta,
-                const float *restshape,
-                const float *dbeta,
+                //Output
+                float *gradient,
+                float *residual
+        ) {
+            // for theta
+            residual[6891] = 0;
+            for (int i = 10; i < 82; i++)
+                residual[6891] += (theta[i] - theta0[i]) * (theta[i] - theta0[i]);
+            residual[6891] = sqrt(residual[6891]);
+            for (int i = 0; i < 10; i++)
+                gradient[6891 * 82 + i] = 0;
+            for (int i = 10; i < 82; i++)
+                gradient[6891 * 82 + i] = 1;
+
+            // for beta
+            residual[6890] = 0;
+            for (int i = 0; i < 10; i++)
+                residual[6890] += (beta[i] - beta0[i]) * (beta[i] - beta0[i]);
+            residual[6890] = sqrt(residual[6890]);
+            for (int i = 0; i < 10; i++)
+                gradient[6890 * 82 + i] = 1;
+            for (int i = 10; i < 82; i++)
+                gradient[6890 * 82 + i] = 0;
+        }
+
+        __global__ void computeJacobianKernel2(
+                const float4 *live_vertex,
+                const float4 *live_normal,
+                const float3 *smpl_vertices,
+                DeviceArrayView<ushort2> pairs,
                 //Output
                 float *gradient,
                 float *residual
         ) {
             const auto idx = threadIdx.x + blockDim.x * blockIdx.x;
-            if (idx >= 6892)
+            if (idx >= pairs.Size())
                 return;
-            if (idx == 6891) {
-                residual[idx] = 0;
-                for (int i = 10; i < 82; i++)
-                    residual[idx] += (theta[i] - theta0[i]) * (theta[i] - theta0[i]);
-                residual[idx] = sqrt(residual[idx]);
-                for (int i = 0; i < 10; i++)
-                    gradient[idx * 82 + i] = 0;
-                for (int i = 10; i < 82; i++)
-                    gradient[idx * 82 + i] = 1;
-                return;
-            }
-            if (idx == 6890) {
-                residual[idx] = 0;
-                for (int i = 0; i < 10; i++)
-                    residual[idx] += (beta[i] - beta0[i]) * (beta[i] - beta0[i]);
-                residual[idx] = sqrt(residual[idx]);
-                for (int i = 0; i < 10; i++)
-                    gradient[idx * 82 + i] = 1;
-                for (int i = 10; i < 82; i++)
-                    gradient[idx * 82 + i] = 0;
-                return;
-            }
-
             const auto cur_pair = pairs[idx];
             const auto smpl = smpl_vertices[cur_pair.x];
             const auto lv4 = live_vertex[cur_pair.y];
@@ -82,13 +61,13 @@ namespace surfelwarp {
             const auto lv = make_float3(lv4.x, lv4.y, lv4.z);
             const auto ln = make_float3(ln4.x, ln4.y, ln4.z);
 
-            residual[idx] = dot(ln, smpl - lv);
+            residual[cur_pair.x] = dot(ln, smpl - lv);
             // beta
             for (int i = 0; i < 10; i++)
-                gradient[idx * 82 + i] = 0;
+                gradient[cur_pair.x * 82 + i] = 0;
             // theta
             for (int i = 10; i < 82; i++)
-                gradient[idx * 82 + i] = dot(ln, smpl);
+                gradient[cur_pair.x * 82 + i] = dot(ln, smpl);
         }
     }
 }
@@ -100,52 +79,50 @@ void surfelwarp::SMPL::ComputeJacobian(
         DeviceArrayView<float> &theta0,
         float *r,
         float *j,
-        mat34 world2camera,
         cudaStream_t stream
 ) {
-    auto poseRotation = DeviceArray<float>(JOINT_NUM * 9);
-    auto restPoseRotation = DeviceArray<float>(JOINT_NUM * 9);
-    auto poseBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
-    auto shapeBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
-    auto joints = DeviceArray<float>(JOINT_NUM * 3);
-    auto globalTransformations = DeviceArray<float>(JOINT_NUM * 16);
-    auto dbeta = DeviceArray<float>(VERTEX_NUM * SHAPE_BASIS_DIM);
+    LbsModel(stream);
+    CountKnn(live_vertex, stream);
 
-    m_restShape = DeviceArray<float>(VERTEX_NUM * 3);
-    m_smpl_vertices = DeviceArray<float3>(VERTEX_NUM);
-
-    countPoseBlendShape(poseRotation, restPoseRotation, poseBlendShape, stream);
-    countShapeBlendShape(shapeBlendShape, stream);
-    regressJoints(shapeBlendShape, poseBlendShape, joints, stream);
-    transform(poseRotation, joints, globalTransformations, stream);
-    skinning(globalTransformations, stream);
-    jacobian_beta(globalTransformations, dbeta, stream);
-    CameraTransform(world2camera, stream);
+    SynchronizeArray<ushort2> pairs;
+    pairs.AllocateBuffer(6890);
+    m_pair_sorting->PerformSorting(m_knn.ArrayView(), m_dist.ArrayView(), pairs);
 
     auto residual = DeviceArray<float>(6892);
     auto gradient = DeviceArray<float>(6892 * 82);
 
-    auto pairs = DeviceArray<ushort2>(m_smpl_vertices.size());
-    device::find_closest_live_vertex<<<m_smpl_vertices.size(),1,0,stream>>>(
-            live_vertex, m_smpl_vertices, pairs);
+    cudaMemset(residual.ptr(), 0, sizeof(float) * 6892);
+    cudaMemset(gradient.ptr(), 0, sizeof(float) * 6892 * 82);
+    cudaStreamSynchronize(stream);
 
     dim3 blk(128);
-    dim3 grid(divUp(6892, blk.x));
-    device::computeJacobianKernel<<<grid, blk, 0, stream>>>(
+    dim3 grid(divUp(pairs.DeviceArraySize(), blk.x));
+    device::computeJacobianKernel2<<<grid, blk, 0, stream>>>(
             live_vertex.RawPtr(),
             live_normal.RawPtr(),
             m_smpl_vertices.ptr(),
-            pairs.ptr(),
-            m__beta.ptr(),
-            beta0.RawPtr(),
-            m__theta.ptr(),
-            theta0.RawPtr(),
-            m_restShape.ptr(),
-            dbeta.ptr(),
+            pairs.DeviceArrayReadOnly(),
             //The output
             gradient.ptr(),
             residual.ptr()
     );
+    device::computeJacobianKernel1<<<1, 1, 0, stream>>>(
+            m__beta.ptr(),
+            beta0.RawPtr(),
+            m__theta.ptr(),
+            theta0.RawPtr(),
+            //The output
+            gradient.ptr(),
+            residual.ptr()
+    );
+    cudaStreamSynchronize(stream);
+    auto error = cudaGetLastError();
+    if(error != cudaSuccess)
+    {
+        // print the CUDA error message and exit
+        printf("2)CUDA error: %s\n", cudaGetErrorString(error));
+        exit(-1);
+    }
     residual.download(r);
     gradient.download(j);
 }

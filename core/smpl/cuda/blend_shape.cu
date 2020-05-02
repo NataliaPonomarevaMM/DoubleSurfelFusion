@@ -66,12 +66,11 @@ namespace surfelwarp {
                 const PtrSz<const float> restPoseRotation,
                 PtrSz<float> poseBlendShape
         ) {
-	    const auto ind = threadIdx.x + 3 * blockIdx.x;
-            
-	    if (ind >= poseBlendShape.size)
-		return;
+            const auto ind = threadIdx.x + blockDim.x * blockIdx.x;
+            if (ind >= poseBlendShape.size)
+                return;
 
-	    poseBlendShape[ind] = 0;
+            poseBlendShape[ind] = 0;
             for (int l = 0; l < 207; l++)
                 poseBlendShape[ind] += (poseRotation[l + 9] - restPoseRotation[l + 9]) *
                       poseBlendBasis[ind * 207 + l];
@@ -83,9 +82,9 @@ namespace surfelwarp {
                 const int shapebasisdim,
                 PtrSz<float> shapeBlendShape
         ) {
-	    const auto ind = threadIdx.x + blockDim.x * blockIdx.x;
-	    if (ind >= shapeBlendShape.size) 
-    		return;
+            const auto ind = threadIdx.x + blockDim.x * blockIdx.x;
+            if (ind >= shapeBlendShape.size)
+                return;
             shapeBlendShape[ind] = 0;
             for (int l = 0; l < shapebasisdim; l++)
                 shapeBlendShape[ind] += beta[l] * shapeBlendBasis[l * 6890 * 3 + ind];// (6890, 3)
@@ -98,12 +97,16 @@ namespace surfelwarp {
             DeviceArray<float> &poseBlendShape,
             cudaStream_t stream) {
         device::PoseBlend1<<<1,JOINT_NUM,0,stream>>>(m__theta, poseRotation, restPoseRotation);
-	    device::PoseBlend2<<<VERTEX_NUM,3,0,stream>>>(poseRotation, m__poseBlendBasis, restPoseRotation, poseBlendShape);
+        dim3 blk(128);
+        dim3 grid(divUp(VERTEX_NUM * 3, blk.x));
+	    device::PoseBlend2<<<grid,blk,0,stream>>>(poseRotation, m__poseBlendBasis, restPoseRotation, poseBlendShape);
     }
 
     void SMPL::countShapeBlendShape(
             DeviceArray<float> &shapeBlendShape,
             cudaStream_t stream) {
-        device::ShapeBlend<<<VERTEX_NUM,3,0,stream>>>(m__beta, m__shapeBlendBasis, SHAPE_BASIS_DIM, shapeBlendShape);
+        dim3 blk(128);
+        dim3 grid(divUp(VERTEX_NUM * 3, blk.x));
+        device::ShapeBlend<<<grid,blk,0,stream>>>(m__beta, m__shapeBlendBasis, SHAPE_BASIS_DIM, shapeBlendShape);
     }
 }

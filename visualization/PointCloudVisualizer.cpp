@@ -424,14 +424,14 @@ void surfelwarp::Visualizer::DrawMatchedCloudPair(
 }
 
 void surfelwarp::Visualizer::SaveSMPLCloud(
-        const DeviceArray<float3> &smpl_vertices,
-        const DeviceArray<int> &face_ind,
+        const DeviceArrayView<float3> &smpl_vertices,
+        const DeviceArrayView<int> &face_ind,
         const std::string &cloud_name
 ) {
     std::vector<float3> h_cloud;
-    smpl_vertices.download(h_cloud);
+    smpl_vertices.Download(h_cloud);
     std::vector<int> h_face;
-    face_ind.download(h_face);
+    face_ind.Download(h_face);
 
     std::ofstream file_output;
     file_output.open(cloud_name);

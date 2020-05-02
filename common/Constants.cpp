@@ -15,7 +15,7 @@ const unsigned surfelwarp::Constants::kMaxMatchedSparseFeature = 20000;
 const int surfelwarp::Constants::kFusionMapScale = d_fusion_map_scale;
 
 //The maximum number of surfels
-const unsigned surfelwarp::Constants::kMaxNumSurfels = 500000;
+const unsigned surfelwarp::Constants::kMaxNumSurfels = 100000;
 
 //The maximum number of nodes
 const unsigned surfelwarp::Constants::kMaxNumNodes = d_max_num_nodes;

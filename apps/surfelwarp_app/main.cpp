@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
 	//auto context = initCudaContext();
 
 	//Save offline
-	bool offline_rendering = true;
+	bool offline_rendering = false;
 
     auto begin = clk::now();
 	//The processing loop

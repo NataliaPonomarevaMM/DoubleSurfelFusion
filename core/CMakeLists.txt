@@ -3,7 +3,7 @@ file(GLOB CORE_GEOMETRY_SRC geometry/*.h geometry/*.cpp geometry/*.cu geometry/*
 file(GLOB CORE_SOLVER_SRC warp_solver/*.h warp_solver/*.cpp warp_solver/*.hpp warp_solver/*.cu warp_solver/*.cuh)
 file(GLOB CORE_SRC *.h *.cuh *.hpp *.cu *.cpp *.c)
 file(GLOB CORE_SMPL_SRC smpl/*.h "*.cpp" smpl/*.cpp smpl/cuda/*.cu)
-file(GLOB CORE_VOLUMETRIC_SRC volumetric/*.h volumetric/*.cpp)
+file(GLOB CORE_VOLUMETRIC_SRC volumetric/*.h volumetric/*.cpp volumetric/*.cu)
 
 source_group("src" FILES ${CORE_SRC})
 source_group("render" FILES ${CORE_RENDER_SRC})

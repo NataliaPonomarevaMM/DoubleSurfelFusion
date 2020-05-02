@@ -9,6 +9,7 @@
 #include "imgproc/ImageProcessor.h"
 #include "imgproc/frameio/VolumeDeformFileFetch.h"
 #include "core/SurfelGeometry.h"
+#include "core/volumetric/PairsSorting.h"
 
 namespace surfelwarp {
     class SMPL {
@@ -25,18 +26,18 @@ namespace surfelwarp {
         DeviceArray<int64_t> m__kinematicTree; // Hierarchy relation between joints, the root is at the belly button, (2, 24).
         DeviceArray<int> m__faceIndices; // (13776, 3)
 
-        ///useful information to store
-        int m_vert_frame = -1;
+        ///smpl information
         DeviceArray<float> m_restShape;
         DeviceArray<float3> m_smpl_vertices;
         DeviceArray<float3> m_smpl_normals;
-        DeviceArray<float> m_dist;
-        unsigned m_num_marked = 0;
-        DeviceArray<unsigned> m_marked_vertices;
-        int m_knn_frame = -1;
-        DeviceArray<ushort4> m_knn;
-        DeviceArray<float4> m_knn_weight;
-        DeviceArray<int> m_onbody;
+        /// surfel-based information
+        DeviceBufferArray<float> m_dist; // (live_vertex.size,6890)
+        unsigned m_num_marked = 0; // number of onbody live vertices
+        DeviceBufferArray<ushort4> m_knn; // smpl knn for live_vertices (m_num_marked)
+        DeviceBufferArray<float4> m_knn_weight; // smpl knn weights for live vertices (m_num_marked)
+        DeviceBufferArray<int> m_onbody; // is live vertex on body (live_vertex.size)
+
+        PairsSorting::Ptr m_pair_sorting;
 
         void countPoseBlendShape(
                 DeviceArray<float> &poseRotation,
@@ -59,34 +60,43 @@ namespace surfelwarp {
         void skinning(
                 const DeviceArray<float> &transformation,
                 cudaStream_t stream);
-        void jacobian_beta(
-                const DeviceArray<float> &transformation,
-                DeviceArray<float> &dtheta,
-                cudaStream_t stream);
         void countNormals(cudaStream_t stream);
-        void markVertices(
+        unsigned count_dist(
                 const DeviceArrayView<float4>& live_vertex,
-                cudaStream_t stream);
-        void countKnn(
+                DeviceArray<unsigned> &marked,
+                DeviceArray<float> &dist,
+                cudaStream_t stream
+        );
+        void count_knn(
                 const DeviceArrayView<float4>& live_vertex,
-                const int frame_idx,
-                mat34 world2camera,
-                cudaStream_t stream);
+                const DeviceArray<float> &dist,
+                const DeviceArray<unsigned> &marked,
+                const unsigned num_marked,
+                DeviceArray<int> &onbody,
+                DeviceArray<ushort4> &knn,
+                DeviceArray<float4> &knn_weight,
+                cudaStream_t stream
+        );
     public:
         using Ptr = std::shared_ptr<SMPL>;
         SMPL();
+        ~SMPL();
         SURFELWARP_NO_COPY_ASSIGN_MOVE(SMPL);
 
-        void lbsModel(mat34 world2camera, cudaStream_t stream);
-        void CameraTransform(mat34 world2camera, cudaStream_t stream);
+        void LbsModel(cudaStream_t stream = 0);
+        void CountKnn(const DeviceArrayView<float4>& live_vertex, cudaStream_t stream = 0);
+        void CountAppendedKnn(
+                const DeviceArrayView<float4>& appended_live_vertex,
+                int num_remaining_surfel,
+                int num_appended_surfel,
+                cudaStream_t stream = 0);
+        void CameraTransform(mat34 world2camera, cudaStream_t stream = 0);
 
-        void Split(
+        void SplitReferenceVertices(
                 const DeviceArrayView<float4>& live_vertex,
                 const DeviceArrayView<float4>& reference_vertex,
-                const int frame_idx,
                 DeviceArray<float4>& onbody_points,
                 DeviceArray<float4>& farbody_points,
-                mat34 world2camera,
                 cudaStream_t stream = 0);
 
         struct SolverInput {
@@ -96,23 +106,14 @@ namespace surfelwarp {
             DeviceArrayView<float4> knn_weight;
             DeviceArrayView<int> onbody;
         };
-        SolverInput SolverAccess(
-                const DeviceArrayView<float4>& live_vertex,
-                const int frame_idx,
-                mat34 world2camera,
-                cudaStream_t stream = 0);
-        DeviceArray<float3> GetVertices() const { return m_smpl_vertices; };
-        DeviceArray<float3> GetNormals() const { return m_smpl_normals; };
-        DeviceArray<int> GetFaceIndices() const { return m__faceIndices; };
+        SolverInput SolverAccess(cudaStream_t stream = 0) const;
+        DeviceArrayView<float3> GetVertices() const { return  DeviceArrayView<float3>(m_smpl_vertices); }
+        DeviceArrayView<float3> GetNormals() const { return  DeviceArrayView<float3>(m_smpl_normals); }
+        DeviceArrayView<int> GetFaceIndices() const { return  DeviceArrayView<int>(m__faceIndices); }
+        DeviceArrayView<float> GetBeta() const {return DeviceArrayView<float>(m__beta); }
+        DeviceArrayView<float> GetTheta() const {return DeviceArrayView<float>(m__theta);}
 
-        DeviceArrayView<float> GetBeta() const {
-            return DeviceArrayView<float>(m__beta);
-        }
-
-        DeviceArrayView<float> GetTheta() const {
-            return DeviceArrayView<float>(m__theta);
-        }
-
+        bool ShouldDoVolumetricOptimization() const {return m_num_marked > 0;}
         void ComputeJacobian(
                 DeviceArrayView<float4> &live_vertex,
                 DeviceArrayView<float4> &live_normal,
@@ -120,7 +121,6 @@ namespace surfelwarp {
                 DeviceArrayView<float> &theta0,
                 float *r,
                 float *j,
-                mat34 world2camera,
                 cudaStream_t stream = 0
         );
     };
@@ -128,7 +128,28 @@ namespace surfelwarp {
     void Transform(
             const DeviceArrayView<float3> &smpl_vertices,
             const DeviceArrayView<float3> &smpl_normals,
-            const DeviceArrayView<float4> &live_vertex
+            const DeviceArrayView<float4> &live_vertex,
+            const DeviceArrayView<int> &face_ind
     );
 } // namespace smpl
+
+
+bool knn_cublas(const float * ref,
+                int           ref_nb,
+                const float * query,
+                int           query_nb,
+                int           dim,
+                int           k,
+                float *       knn_dist,
+                int *         knn_index);
+
+bool knn_cuda_texture(const float * ref,
+                      int           ref_nb,
+                      const float * query,
+                      int           query_nb,
+                      int           dim,
+                      int           k,
+                      float *       knn_dist,
+                      int *         knn_index);
+
 #endif // SMPL_H

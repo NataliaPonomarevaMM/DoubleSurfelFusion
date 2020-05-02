@@ -4,6 +4,7 @@
 #include "core/smpl/smpl.h"
 #include "core/smpl/def.h"
 #include "math/vector_ops.hpp"
+#include "common/Constants.h"
 
 namespace surfelwarp {
     void moveModel() {
@@ -94,9 +95,22 @@ namespace surfelwarp {
         auto theta = tb_data["theta"].get<std::vector<float>>();
         m__theta.upload(theta.data(), 72);
         m__beta.upload(beta.data(), 10);
+
+        m_pair_sorting = std::make_shared<PairsSorting>();
+        m_dist.AllocateBuffer(Constants::kMaxNumSurfels * VERTEX_NUM);
+        m_onbody.AllocateBuffer(Constants::kMaxNumSurfels);
+        m_knn.AllocateBuffer(Constants::kMaxNumSurfels);
+        m_knn_weight.AllocateBuffer(Constants::kMaxNumSurfels);
     }
 
-    void SMPL::lbsModel(mat34 world2camera, cudaStream_t stream) {
+    SMPL::~SMPL() {
+        m_dist.ReleaseBuffer();
+        m_onbody.ReleaseBuffer();
+        m_knn.ReleaseBuffer();
+        m_knn_weight.ReleaseBuffer();
+    }
+
+    void SMPL::LbsModel(cudaStream_t stream) {
 	    auto poseRotation = DeviceArray<float>(JOINT_NUM * 9);
         auto restPoseRotation = DeviceArray<float>(JOINT_NUM * 9);
         auto poseBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
@@ -113,26 +127,16 @@ namespace surfelwarp {
         transform(poseRotation, joints, globalTransformations, stream);
 	    skinning(globalTransformations, stream);
         countNormals(stream);
-        //CameraTransform(world2camera, stream);
     }
 
-    SMPL::SolverInput SMPL::SolverAccess(
-            const DeviceArrayView<float4>& live_vertex,
-            const int frame_idx,
-            mat34 world2camera,
-            cudaStream_t stream)
+    SMPL::SolverInput SMPL::SolverAccess(cudaStream_t stream) const
     {
-        if (m_knn_frame != frame_idx) {
-            countKnn(live_vertex, frame_idx, world2camera, stream);
-            m_knn_frame = frame_idx;
-        }
-
         SolverInput solver_input;
         solver_input.smpl_vertices = m_smpl_vertices;
         solver_input.smpl_normals = m_smpl_normals;
-        solver_input.knn = m_knn;
-        solver_input.knn_weight = m_knn_weight;
-        solver_input.onbody = m_onbody;
+        solver_input.knn = m_knn.ArrayView();
+        solver_input.knn_weight = m_knn_weight.ArrayView();
+        solver_input.onbody = m_onbody.ArrayView();
         return solver_input;
     }
 } // namespace smpl

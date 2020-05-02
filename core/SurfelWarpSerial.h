@@ -107,8 +107,8 @@ namespace surfelwarp {
         void saveCorrespondedCloud(
             const CameraObservation &observation,
             unsigned vao_idx,
-            const DeviceArray<float3> &smpl_vertices,
-            const DeviceArray<int> &face_ind,
+            const DeviceArrayView<float3> &smpl_vertices,
+            const DeviceArrayView<int> &face_ind,
             const boost::filesystem::path &save_dir
         );
 
