@@ -97,7 +97,7 @@ namespace surfelwarp {
         m__beta.upload(beta.data(), 10);
 
         m_pair_sorting = std::make_shared<PairsSorting>();
-        m_dist.AllocateBuffer(Constants::kMaxNumSurfels * VERTEX_NUM);
+        m_dist.AllocateBuffer(Constants::kMaxNumSurfels * 4);
         m_onbody.AllocateBuffer(Constants::kMaxNumSurfels);
         m_knn.AllocateBuffer(Constants::kMaxNumSurfels);
         m_knn_weight.AllocateBuffer(Constants::kMaxNumSurfels);
@@ -117,16 +117,19 @@ namespace surfelwarp {
         auto shapeBlendShape = DeviceArray<float>(VERTEX_NUM * 3);
         auto joints = DeviceArray<float>(JOINT_NUM * 3);
         auto globalTransformations = DeviceArray<float>(JOINT_NUM * 16);
+        auto localTransformations = DeviceArray<float>(JOINT_NUM * 16);
 
         m_restShape = DeviceArray<float>(VERTEX_NUM * 3);
         m_smpl_vertices = DeviceArray<float3>(VERTEX_NUM);
 
         countPoseBlendShape(poseRotation, restPoseRotation, poseBlendShape, stream);
         countShapeBlendShape(shapeBlendShape, stream);
-        regressJoints(shapeBlendShape, poseBlendShape, joints, stream);
-        transform(poseRotation, joints, globalTransformations, stream);
+        countRestShape(shapeBlendShape, poseBlendShape, stream);
+        regressJoints(shapeBlendShape, joints, stream);
+        transform(poseRotation, joints, globalTransformations, localTransformations, stream);
 	    skinning(globalTransformations, stream);
         countNormals(stream);
+        transform(stream);
     }
 
     SMPL::SolverInput SMPL::SolverAccess(cudaStream_t stream) const

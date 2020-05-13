@@ -451,6 +451,25 @@ void surfelwarp::Visualizer::SaveSMPLCloud(
     file_output.close();
 }
 
+void surfelwarp::Visualizer::SaveCloud(
+        const DeviceArrayView<float4> &vertices,
+        const std::string &cloud_name
+) {
+    std::vector<float4> h_cloud;
+    vertices.Download(h_cloud);
+
+    std::ofstream file_output;
+    file_output.open(cloud_name);
+    for (auto i = 0; i < h_cloud.size(); i++) {
+        const auto point = h_cloud[i];
+        file_output << 'v' << ' '
+                    << point.x << ' '
+                    << point.y << ' '
+                    << point.z << std::endl;
+    }
+    file_output.close();
+}
+
 void surfelwarp::Visualizer::SaveColoredPointCloud(const std::vector<float4> points,
                                                    const uchar3 color,
                                                    const std::string &path) {

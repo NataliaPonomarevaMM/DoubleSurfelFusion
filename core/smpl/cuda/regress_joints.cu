@@ -6,7 +6,7 @@
 
 namespace surfelwarp {
     namespace device {
-        __global__ void RegressJoints1(
+        __global__ void countRS(
                 const PtrSz<const float> templateRestShape,
                 const PtrSz<const float> shapeBlendShape,
                 const PtrSz<const float> poseBlendShape,
@@ -38,16 +38,24 @@ namespace surfelwarp {
         }
     }
 
-    void SMPL::regressJoints(
+    void SMPL::countRestShape(
             const DeviceArray<float> &shapeBlendShape,
             const DeviceArray<float> &poseBlendShape,
+            cudaStream_t stream
+    ) {
+        dim3 blk(128);
+        dim3 grid(divUp(VERTEX_NUM * 3, blk.x));
+        device::countRS<<<grid, blk,0,stream>>>(m__templateRestShape,
+                shapeBlendShape, poseBlendShape, m_restShape);
+    }
+
+    void SMPL::regressJoints(
+            const DeviceArray<float> &shapeBlendShape,
             DeviceArray<float> &joints,
             cudaStream_t stream
     ) {
         dim3 blk(128);
         dim3 grid(divUp(VERTEX_NUM * 3, blk.x));
-        device::RegressJoints1<<<grid, blk,0,stream>>>(m__templateRestShape,
-                shapeBlendShape, poseBlendShape, m_restShape);
         device::RegressJoints2<<<grid, blk,0,stream>>>(m__templateRestShape,
                 shapeBlendShape, m__jointRegressor, VERTEX_NUM, joints);
     }

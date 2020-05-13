@@ -194,6 +194,10 @@ namespace surfelwarp {
                 const DeviceArrayView<int> &face_ind,
                 const std::string &cloud_name
         );
+        static void SaveCloud(
+                const DeviceArrayView<float4> &vertices,
+                const std::string &cloud_name
+        );
 
 static void SaveMatchedCloudPair(
         cudaTextureObject_t cloud_1,

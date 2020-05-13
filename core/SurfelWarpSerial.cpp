@@ -70,12 +70,6 @@ surfelwarp::SurfelWarpSerial::SurfelWarpSerial() {
 	//The frame index
 	m_frame_idx = config.start_frame_idx();
 	m_reinit_frame_idx = m_frame_idx;
-
-//	m_smpl_model->LbsModel();
-//	const auto& save_dir = createOrGetDataDirectory(m_frame_idx);
-//	const std::string smpl_cloud_name = (save_dir / "smpl.obj").string();
-//	Visualizer::SaveSMPLCloud(m_smpl_model->GetVertices(),m_smpl_model->GetFaceIndices(), smpl_cloud_name);
-//	std::cout << "saved\n";
 }
 
 surfelwarp::SurfelWarpSerial::~SurfelWarpSerial() {
@@ -97,38 +91,50 @@ void surfelwarp::SurfelWarpSerial::ProcessFirstFrame() {
 
     const auto live_vertex = m_surfel_geometry[m_updated_geometry_index]->LiveVertexConfidence();
 
+    std::cout << "num of live vertex " << live_vertex.Size() << "\n";
     auto begin = clk::now();
     m_smpl_model->LbsModel();
     auto end = clk::now();
     auto time = std::chrono::duration_cast<ms>(end - begin);
     std::cout << "1) smpl time " << (double)time.count() << std::endl;
+
+//    begin = clk::now();
+//    m_smpl_model->Transform(live_vertex);
+//    end = clk::now();
+//    time = std::chrono::duration_cast<ms>(end - begin);
+//    std::cout << "2) transform time " << (double)time.count() << std::endl;
+
     begin = clk::now();
     m_smpl_model->CountKnn(live_vertex);
     end = clk::now();
     time = std::chrono::duration_cast<ms>(end - begin);
-    std::cout << "2) count knn time " << (double)time.count() << std::endl;
-
-//    const auto vert = m_smpl_model->GetVertices();
-//    const auto norm = m_smpl_model->GetNormals();
-//    const auto faces = m_smpl_model->GetFaceIndices();
-//
-//	Transform(vert, norm, live_vertex, faces);
+    std::cout << "3) count knn time " << (double)time.count() << std::endl;
 
 	//Build the reference vertex and SE3 for the warp field
 	const auto reference_vertex = m_surfel_geometry[m_updated_geometry_index]->ReferenceVertexConfidence();
     DeviceArray<float4> onbody, farbody;
     m_smpl_model->SplitReferenceVertices(live_vertex, reference_vertex, onbody, farbody);
 
+
+    const auto& save_dir = createOrGetDataDirectory(m_frame_idx);
+	const std::string smpl_cloud_name = (save_dir / "smpl.obj").string();
+    const std::string onbody_name = (save_dir / "onbody.obj").string();
+    const std::string farbody_name = (save_dir / "farbody.obj").string();
+	Visualizer::SaveSMPLCloud(m_smpl_model->GetVertices(),m_smpl_model->GetFaceIndices(), smpl_cloud_name);
+    Visualizer::SaveCloud(DeviceArrayView<float4>(onbody), onbody_name);
+    Visualizer::SaveCloud(DeviceArrayView<float4>(farbody), farbody_name);
+	std::cout << "saved\n";
+
     m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(
 		DeviceArrayView<float4>(onbody), DeviceArrayView<float4>(farbody), m_warp_field);
 
 	//Build the index and skinning nodes and surfels
 	m_warp_field->BuildNodeGraph();
-	
+
 	//Perform skinning
 	const auto& reference_nodes = m_warp_field->ReferenceNodeCoordinates();
 	m_reference_knn_skinner->BuildInitialSkinningIndex(reference_nodes);
-	
+
 	auto skinner_geometry = m_surfel_geometry[m_updated_geometry_index]->SkinnerAccess();
 	auto skinner_warpfield = m_warp_field->SkinnerAccess();
 	m_reference_knn_skinner->PerformSkinning(skinner_geometry, skinner_warpfield);
@@ -165,7 +171,7 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 	CameraObservation observation;
 	//m_image_processor->ProcessFrameSerial(observation, m_frame_idx);
 	m_image_processor->ProcessFrameStreamed(observation, m_frame_idx);
-	
+
 	//First perform rigid solver
 	m_rigid_solver->SetInputMaps(solver_maps, observation, m_camera.GetWorld2Camera());
 	const mat34 solved_world2camera = m_rigid_solver->Solve();
@@ -191,6 +197,19 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 	//Solve it
 	m_warp_solver->SolveStreamed();
 	const auto solved_se3 = m_warp_solver->SolvedNodeSE3();
+
+	const auto& dir = createOrGetDataDirectory(m_frame_idx);
+	const std::string se3_file = (dir / "se3.txt").string();
+	std::ofstream f(se3_file);
+	std::vector<DualQuaternion> q;
+	solved_se3.Download(q);
+
+	for (int i = 0; i < q.size(); i++) {
+	    f << q[i].q0.x() << " " << q[i].q0.y() << " " << q[i].q0.z() << " " << q[i].q0.w() << "; ";
+        f << q[i].q1.x() << " " << q[i].q1.y() << " " << q[i].q1.z() << " " << q[i].q1.w() << "\n";
+	}
+
+	std::cout << "solved\n";
 
 	//Do a forward warp and build index
 	m_warp_field->UpdateHostDeviceNodeSE3NoSync(solved_se3);
@@ -222,8 +241,12 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 	//The geometry index that both fusion and reinit will write to, if no writing then keep current geometry index
 	auto fused_geometry_idx = m_updated_geometry_index;
 
+	std::cout << "done 1\n";
+
 	//Depends on should do reinit or integrate
 	if(use_reinit) {
+
+	    std::cout << "use reinit\n";
 		//First setup the idx
 		m_reinit_frame_idx = m_frame_idx;
 		fused_geometry_idx = (m_updated_geometry_index + 1) % 2;
@@ -247,11 +270,6 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 		const auto reference_vertex = m_surfel_geometry[fused_geometry_idx]->ReferenceVertexConfidence();
         const auto live_vertex = m_surfel_geometry[fused_geometry_idx]->LiveVertexConfidence();
 
-//        auto begin = clk::now();
-//        m_smpl_model->LbsModel();
-//        auto end = clk::now();
-//        auto time = std::chrono::duration_cast<ms>(end - begin);
-//        std::cout << "1) reinit smpl time " << (double)time.count() << std::endl;
         auto begin = clk::now();
         m_smpl_model->CountKnn(live_vertex);
         auto end = clk::now();
@@ -320,11 +338,7 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 
         const float4* live_vertex_ptr = m_surfel_geometry[fused_geometry_idx]->LiveVertexConfidence().RawPtr() + num_remaining_surfel;
         DeviceArrayView<float4> live_vertex_view(live_vertex_ptr, num_appended_surfel);
-//        auto begin = clk::now();
-//        m_smpl_model->LbsModel();
-//        auto end = clk::now();
-//        auto time = std::chrono::duration_cast<ms>(end - begin);
-//        std::cout << "1) smpl time " << (double)time.count() << std::endl;
+
         auto begin = clk::now();
         m_smpl_model->CountAppendedKnn(live_vertex_view, num_remaining_surfel, num_appended_surfel);
         auto end = clk::now();
@@ -337,8 +351,12 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
         std::cout << "started in volumetric optimization\n";
         auto v = m_surfel_geometry[fused_geometry_idx]->LiveVertexConfidence();
         auto n = m_surfel_geometry[fused_geometry_idx]->LiveNormalRadius();
-        // here smpl lbs model
+
+        auto begin = clk::now();
         m_volumetric_optimization->Solve(m_smpl_model, v, n);
+        auto end = clk::now();
+        auto time = std::chrono::duration_cast<ms>(end - begin);
+        std::cout << "5) volumetric optimiz time " << (double)time.count() << std::endl;
     }
 
     //Unmap attributes

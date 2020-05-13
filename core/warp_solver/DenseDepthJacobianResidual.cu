@@ -119,25 +119,47 @@ namespace surfelwarp { namespace device {
         const auto reference_index = tex2D<unsigned>(index_map, potential_pixel.x, potential_pixel.y);
 
         //to fill
-        float3 warped_vertex, warped_normal;
+        //       float3 warped_vertex, warped_normal;
+//        if (onbody[reference_index] != -1) {
+//            const int ind = onbody[reference_index];
+//            // should warp smpl
+//            const ushort4 knn = smpl_knn[ind];
+//            const float4 knn_weight = smpl_knn_weight[ind];
+//            //Warp it
+//            warped_vertex = apply(smpl_vertices, knn, knn_weight);
+//            warped_normal = apply_normal(smpl_normals, knn, knn_weight);
+//        } else {
+//            const ushort4 knn = potential_matched_knn[idx];
+//            const float4 knn_weight = potential_matched_knn_weight[idx];
+//            DualQuaternion dq_average = averageDualQuaternion(node_se3, knn, knn_weight);
+//            const mat34 se3 = dq_average.se3_matrix();
+//            //Warp it
+//            warped_vertex = se3.rot * can_vertex4 + se3.trans;
+//            warped_normal = se3.rot * can_normal4;
+//        }
 
-        if (onbody[reference_index] != -1) {
-            const int ind = onbody[reference_index];
-            // should warp smpl
-            const ushort4 knn = smpl_knn[ind];
-            const float4 knn_weight = smpl_knn_weight[ind];
-            //Warp it
-            warped_vertex = apply(smpl_vertices, knn, knn_weight);
-            warped_normal = apply_normal(smpl_normals, knn, knn_weight);
-        } else {
-            const ushort4 knn = potential_matched_knn[idx];
-            const float4 knn_weight = potential_matched_knn_weight[idx];
-            DualQuaternion dq_average = averageDualQuaternion(node_se3, knn, knn_weight);
-            const mat34 se3 = dq_average.se3_matrix();
-            //Warp it
-            warped_vertex = se3.rot * can_vertex4 + se3.trans;
-            warped_normal = se3.rot * can_normal4;
-        }
+        const ushort4 knn = potential_matched_knn[idx];
+        const float4 knn_weight = potential_matched_knn_weight[idx];
+        DualQuaternion dq_average = averageDualQuaternion(node_se3, knn, knn_weight);
+        const mat34 se3 = dq_average.se3_matrix();
+        //Warp it
+        auto warped_vertex = se3.rot * can_vertex4 + se3.trans;
+        auto warped_normal = se3.rot * can_normal4;
+
+//        if (onbody[reference_index] != -1) {
+//            const int testind = onbody[reference_index];
+//            // should warp smpl
+//            const ushort4 testknn = smpl_knn[testind];
+//            const float4 testknn_weight = smpl_knn_weight[testind];
+//            //Warp it
+//            auto testvertex = apply(smpl_vertices, testknn, testknn_weight);
+//
+//            if (abs(warped_vertex.x - testvertex.x) > 0.5 ||
+//                abs(warped_vertex.y - testvertex.y) > 0.5 ||
+//                abs(warped_vertex.z - testvertex.z) > 0.5)
+//                printf("is: %f %f %f, could be: %f, %f, %f\n", warped_vertex.x, warped_vertex.y,
+//                    warped_vertex.z, testvertex.x, testvertex.y, testvertex.z);
+//        }
 
 		//Transfer to the camera frame
 		const float3 warped_vertex_camera = world2camera.rot * warped_vertex + world2camera.trans;
@@ -263,7 +285,7 @@ void surfelwarp::DenseDepthHandler::ComputeJacobianTermsFixedIndex(cudaStream_t 
 		m_term_twist_gradient.Ptr(),
 		m_term_residual.Ptr()
 	);
-	
+
 	//Sync and check error
 #if defined(CUDA_DEBUG_SYNC_CHECK)
 	cudaSafeCall(cudaStreamSynchronize(stream));

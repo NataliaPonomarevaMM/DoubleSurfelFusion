@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
 	//auto context = initCudaContext();
 
 	//Save offline
-	bool offline_rendering = false;
+	bool offline_rendering = true;
 
     auto begin = clk::now();
 	//The processing loop
@@ -47,10 +47,11 @@ int main(int argc, char** argv) {
     fusion.ProcessFirstFrame();
     end = clk::now();
     time = std::chrono::duration_cast<ms>(end - begin);
-    std::cout << ") time " << (double)time.count() << std::endl;
+    std::cout << ") first frame time " << (double)time.count() << std::endl;
 
 	double sr = 0;
 	for (auto i = 0; i < config.num_frames(); i++){
+    //for (auto i = 0; i < 1; i++){
 		LOG(INFO) << "The " << i << "th Frame";
         auto begin = clk::now();
         fusion.ProcessNextFrameWithReinit(offline_rendering);
@@ -60,7 +61,7 @@ int main(int argc, char** argv) {
         std::cout << i << ") time " << (double)time.count() << std::endl;
 	}
     sr /= config.num_frames();
-    std::cout << "SR: " << sr << " mcs" << std::endl;
+    std::cout << "SR: " << sr << " ms" << std::endl;
 	
 	//destroyCudaContext(context);
 }

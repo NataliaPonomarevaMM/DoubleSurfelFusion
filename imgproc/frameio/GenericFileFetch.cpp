@@ -41,13 +41,13 @@ surfelwarp::GenericFileFetch::GenericFileFetch(const fs::path& data_path, std::s
 	for (auto& path : sorted_paths) {
 		if (FilenameIndicatesDepthImage(path.filename().string(), extension)) {
 			int frame_number = GetFrameNumber(path);
-			if (frame_number != m_depth_image_paths.size()) {
+			if (frame_number != 100+m_depth_image_paths.size()) {
 				throw std::runtime_error("Unexpected depth frame number encountered");
 			}
 			m_depth_image_paths.push_back(path);
 		} else if (FilenameIndicatesRGBImage(path.filename().string(), extension)) {
 			int frame_number = GetFrameNumber(path);
-			if (frame_number != m_rgb_image_paths.size()) {
+			if (frame_number != 100+m_rgb_image_paths.size()) {
 				throw std::runtime_error("Unexpected RGB frame number encountered");
 			}
 			m_rgb_image_paths.push_back(path);

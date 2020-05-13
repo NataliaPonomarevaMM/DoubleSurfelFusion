@@ -16,6 +16,8 @@ namespace surfelwarp {
     private:
         DeviceArray<float> m__beta;
         DeviceArray<float> m__theta;
+        DeviceArray<float> m__beta0;
+        DeviceArray<float> m__theta0;
 
         ///constant
         DeviceArray<float> m__poseBlendBasis; // Basis of the pose-dependent shape space, (6890, 3, 207).
@@ -38,6 +40,7 @@ namespace surfelwarp {
         DeviceBufferArray<int> m_onbody; // is live vertex on body (live_vertex.size)
 
         PairsSorting::Ptr m_pair_sorting;
+        mat34 init_mat;
 
         void countPoseBlendShape(
                 DeviceArray<float> &poseRotation,
@@ -47,15 +50,19 @@ namespace surfelwarp {
         void countShapeBlendShape(
                 DeviceArray<float> &shapeBlendShape,
                 cudaStream_t stream);
-        void regressJoints(
+        void countRestShape(
                 const DeviceArray<float> &shapeBlendShape,
                 const DeviceArray<float> &poseBlendShape,
+                cudaStream_t stream);
+        void regressJoints(
+                const DeviceArray<float> &shapeBlendShape,
                 DeviceArray<float> &joints,
                 cudaStream_t stream);
         void transform(
                 const DeviceArray<float> &poseRotation,
                 const DeviceArray<float> &joints,
                 DeviceArray<float> &globalTransformations,
+                DeviceArray<float> &localTransformations,
                 cudaStream_t stream);
         void skinning(
                 const DeviceArray<float> &transformation,
@@ -65,18 +72,21 @@ namespace surfelwarp {
                 const DeviceArrayView<float4>& live_vertex,
                 DeviceArray<unsigned> &marked,
                 DeviceArray<float> &dist,
+                DeviceArray<int> &knn_ind,
                 cudaStream_t stream
         );
         void count_knn(
-                const DeviceArrayView<float4>& live_vertex,
                 const DeviceArray<float> &dist,
                 const DeviceArray<unsigned> &marked,
+                const DeviceArray<int> &knn_ind,
                 const unsigned num_marked,
                 DeviceArray<int> &onbody,
                 DeviceArray<ushort4> &knn,
                 DeviceArray<float4> &knn_weight,
                 cudaStream_t stream
         );
+        void transform(cudaStream_t stream);
+        void countPoseJac(DeviceArray<float3> &vertJac,cudaStream_t stream);
     public:
         using Ptr = std::shared_ptr<SMPL>;
         SMPL();
@@ -112,6 +122,14 @@ namespace surfelwarp {
         DeviceArrayView<int> GetFaceIndices() const { return  DeviceArrayView<int>(m__faceIndices); }
         DeviceArrayView<float> GetBeta() const {return DeviceArrayView<float>(m__beta); }
         DeviceArrayView<float> GetTheta() const {return DeviceArrayView<float>(m__theta);}
+        DeviceArrayView<float> GetBeta0() {
+            m__beta.copyTo(m__beta0);
+            return DeviceArrayView<float>(m__beta0);
+        }
+        DeviceArrayView<float> GetTheta0() {
+            m__theta.copyTo(m__theta0);
+            return DeviceArrayView<float>(m__theta0);
+        }
 
         bool ShouldDoVolumetricOptimization() const {return m_num_marked > 0;}
         void ComputeJacobian(
@@ -123,25 +141,15 @@ namespace surfelwarp {
                 float *j,
                 cudaStream_t stream = 0
         );
-    };
+        void AddBetaTheta(
+                DeviceArrayView<float> &to_add,
+                cudaStream_t stream = 0
+        );
 
-    void Transform(
-            const DeviceArrayView<float3> &smpl_vertices,
-            const DeviceArrayView<float3> &smpl_normals,
-            const DeviceArrayView<float4> &live_vertex,
-            const DeviceArrayView<int> &face_ind
-    );
+        void Transform(const surfelwarp::DeviceArrayView<float4> &live_vertex,cudaStream_t stream = 0);
+    };
 } // namespace smpl
 
-
-bool knn_cublas(const float * ref,
-                int           ref_nb,
-                const float * query,
-                int           query_nb,
-                int           dim,
-                int           k,
-                float *       knn_dist,
-                int *         knn_index);
 
 bool knn_cuda_texture(const float * ref,
                       int           ref_nb,

@@ -91,18 +91,18 @@ namespace surfelwarp { namespace device {
 			term_values[fill_offset + 3] = term_idx;
 			return;
 		}
-        //For bind term
-        term_offset += sparse_feature_knn.Size();
-        kv_offset += 4 * sparse_feature_knn.Size();
-        if(term_idx < term_offset + node_bind_index.Size())
-        {
-            const auto in_term_offset = term_idx - term_offset;
-            const auto fill_offset = kv_offset + 1 * in_term_offset;
-            const auto node = node_bind_index[in_term_offset];
-            node_keys[fill_offset] = node;
-            term_values[fill_offset] = term_idx;
-            return;
-        }
+//        //For bind term
+//        term_offset += sparse_feature_knn.Size();
+//        kv_offset += 4 * sparse_feature_knn.Size();
+//        if(term_idx < term_offset + node_bind_index.Size())
+//        {
+//            const auto in_term_offset = term_idx - term_offset;
+//            const auto fill_offset = kv_offset + 1 * in_term_offset;
+//            const auto node = node_bind_index[in_term_offset];
+//            node_keys[fill_offset] = node;
+//            term_values[fill_offset] = term_idx;
+//            return;
+//        }
 	} // The kernel to fill the key-value pairs
 
 	__global__ void computeTermOffsetKernel(

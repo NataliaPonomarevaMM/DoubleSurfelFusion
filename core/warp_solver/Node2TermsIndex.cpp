@@ -79,7 +79,7 @@ unsigned surfelwarp::Node2TermsIndex::NumTerms() const
 	return 
 	  m_term2node.dense_image_knn.Size()
 	+ m_term2node.node_graph.Size()
-	+ m_term2node.node_bind_index.Size()
+	//+ m_term2node.node_bind_index.Size()
 	+ m_term2node.foreground_mask_knn.Size() 
 	+ m_term2node.sparse_feature_knn.Size();
 }
@@ -90,7 +90,7 @@ unsigned surfelwarp::Node2TermsIndex::NumKeyValuePairs() const
 	return 
 	  m_term2node.dense_image_knn.Size() * 4
 	+ m_term2node.node_graph.Size() * 2
-	+ m_term2node.node_bind_index.Size()
+	//+ m_term2node.node_bind_index.Size()
 	+ m_term2node.foreground_mask_knn.Size() * 4 
 	+ m_term2node.sparse_feature_knn.Size() * 4;
 }

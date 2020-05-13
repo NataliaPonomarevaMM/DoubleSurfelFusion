@@ -15,12 +15,12 @@ const unsigned surfelwarp::Constants::kMaxMatchedSparseFeature = 20000;
 const int surfelwarp::Constants::kFusionMapScale = d_fusion_map_scale;
 
 //The maximum number of surfels
-const unsigned surfelwarp::Constants::kMaxNumSurfels = 100000;
+const unsigned surfelwarp::Constants::kMaxNumSurfels = 200000;
 
 //The maximum number of nodes
 const unsigned surfelwarp::Constants::kMaxNumNodes = d_max_num_nodes;
 const unsigned surfelwarp::Constants::kMaxNumNodePairs = 60 * surfelwarp::Constants::kMaxNumNodes;
-const unsigned surfelwarp::Constants::kMaxNumSurfelCandidates = 50000;
+const unsigned surfelwarp::Constants::kMaxNumSurfelCandidates = 60000;
 
 //The average and sampling distance between nodes
 const float surfelwarp::Constants::kNodeRadius = d_node_radius;

@@ -75,10 +75,9 @@ namespace surfelwarp {
             const DeviceArray<float> &poseRotation,
             const DeviceArray<float> &joints,
             DeviceArray<float> &globalTransformations,
+            DeviceArray<float> &localTransformations,
             cudaStream_t stream
     ) {
-        auto localTransformations = DeviceArray<float>(JOINT_NUM * 16);
-
         device::LocalTransform<<<1,JOINT_NUM,0,stream>>>(joints, m__kinematicTree,
                 poseRotation, localTransformations);
         device::GlobalTransform<<<1,1,0,stream>>>(localTransformations, m__kinematicTree,

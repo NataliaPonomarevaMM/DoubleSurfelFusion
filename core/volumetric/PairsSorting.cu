@@ -1,11 +1,9 @@
-#include "common/encode_utils.h"
 #include "common/Constants.h"
-#include "math/vector_ops.hpp"
 #include "core/volumetric/PairsSorting.h"
 #include <device_launch_parameters.h>
 
 namespace surfelwarp { namespace device {
-	
+
 	__global__ void createSMPLKeyKernel(
 		DeviceArrayView<ushort4> knn,
 		ushort* smpl_key,
@@ -55,22 +53,22 @@ namespace surfelwarp { namespace device {
 		const DeviceArrayView<ushort> compacted_key,
 		const int* compacted_offset,
 		const ushort* sorted_surfel_ind,
-        const float* dist,
+        const DeviceArrayView<float> dist,
 		ushort2* pairs
 	) {
 		const auto idx = threadIdx.x + blockDim.x * blockIdx.x;
 		if (idx >= compacted_key.Size()) return;
 
 		const ushort smpl_ind = compacted_key[idx]; // smpl point
+		const int num = dist.Size() / 4;
 
 		// Find surfel closed to the smpl point
 		float min_dist = 1e5;
 		int min_dist_idx = compacted_offset[idx];
 		for (int i = compacted_offset[idx]; i < compacted_offset[idx + 1]; i++) {
 			const ushort surfel_ind = sorted_surfel_ind[i];
-            const int dist_ind = surfel_ind * 6890 + smpl_ind;
-			if (dist[dist_ind] < min_dist) {
-				min_dist = dist[dist_ind];
+			if (dist[0 * num + surfel_ind] < min_dist) {
+				min_dist = dist[0 * num + surfel_ind];
 				min_dist_idx = i;
 			}
 		}
@@ -101,7 +99,7 @@ surfelwarp::PairsSorting::~PairsSorting() {
     m_surfel_ind.ReleaseBuffer();
 
 	m_smpl_label.ReleaseBuffer();
-	
+
 	//smaller buffer
 	m_compacted_smpl_key.ReleaseBuffer();
 	m_compacted_smpl_offset.ReleaseBuffer();
@@ -125,7 +123,7 @@ void surfelwarp::PairsSorting::buildKeyForPoints(
 	//Correct the size of arrays
 	m_smpl_key.ResizeArrayOrException(knn.Size());
     m_surfel_ind.ResizeArrayOrException(knn.Size());
-	
+
 	//Call the method
 	dim3 blk(256);
 	dim3 grid(divUp(knn.Size(), blk.x));
@@ -149,7 +147,7 @@ void surfelwarp::PairsSorting::sortCompactKeys(
 		m_smpl_key_sort.valid_sorted_key,
 		m_smpl_label.ArraySlice()
 	);
-	
+
 	//Prefix sum
 	m_smpl_label_prefixsum.InclusiveSum(m_smpl_label.ArrayView(), stream);
 
@@ -164,7 +162,7 @@ void surfelwarp::PairsSorting::sortCompactKeys(
 		stream
 	));
 	cudaSafeCall(cudaStreamSynchronize(stream));
-	
+
 	//Construct the compacted array
 	m_compacted_smpl_key.ResizeArrayOrException(num_smpl_points);
 	m_compacted_smpl_offset.ResizeArrayOrException(num_smpl_points + 1);
@@ -192,10 +190,10 @@ void surfelwarp::PairsSorting::collectSynchronizePairs(
 		m_compacted_smpl_key.ArrayView(),
 		m_compacted_smpl_offset,
 		m_smpl_key_sort.valid_sorted_value,
-		dist.RawPtr(),
+		dist,
 		pairs_slice
 	);
-	
+
 	//Sync it to host
 	pairs.SynchronizeToHost(stream);
 }
