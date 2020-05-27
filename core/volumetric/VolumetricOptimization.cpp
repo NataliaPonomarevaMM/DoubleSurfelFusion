@@ -3,68 +3,76 @@
 
 #include "core/volumetric/VolumetricOptimization.h"
 
+float count_dist(float *r) {
+    float dist = 0;
+    for (int i = 0; i < 6891; i++)
+        dist += r[i] * r[i];
+    return sqrt(dist);
+}
+
 void surfelwarp::VolumetricOptimization::Solve(
-        SMPL::Ptr smpl_handler,
         DeviceArrayView<float4> &live_vertex,
-        DeviceArrayView<float4> &live_normal
+        cudaStream_t stream
 ) {
-    std::cout << "started\n";
-    auto beta0 = smpl_handler->GetBeta0();
-    auto theta0 = smpl_handler->GetTheta0();
+    CheckPoints(live_vertex, stream);
+    for (auto i = 0; i < Constants::kNumGaussNewtonIterations; i++) {
+        for (auto k = 0; k < 3; k++) {
+            auto cur_knn = k == 0 ? m_knn_body : (k == 1 ? m_knn_left_arm : m_knn_right_arm);
 
-    //for (auto i = 0; i < Constants::kNumGaussNewtonIterations; i++) {
-    for (auto i = 0; i < 1; i++) {
-        float r[6892], j[6892 * 82];
-        smpl_handler->ComputeJacobian(live_vertex, live_normal, beta0, theta0, r, j);
+            float r[6891], j[6891 * 72];
+            ComputeJacobian(live_vertex, cur_knn, r, j, stream);
+            float distt = count_dist(r);
 
-        std::cout << "jacobian computed\n";
+            Eigen::MatrixXf J = Eigen::Map<Eigen::Matrix<float, 6891, 72>>(j);
+            Eigen::VectorXf R(Eigen::Map<Eigen::VectorXf>(r, 6891));
+            Eigen::MatrixXf Jt = J.transpose();
+            Eigen::MatrixXf JtJ = Jt * J; // A
+            Eigen::VectorXf b = -1 * Jt * R;
 
-        Eigen::MatrixXf J = Eigen::Map<Eigen::Matrix<float,6892,82>>(j);
-        Eigen::VectorXf R(Eigen::Map<Eigen::VectorXf>(r, 6892));
+            Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXf> lscg;
+            lscg.compute(JtJ);
+            auto x = lscg.solve(b);
 
-        Eigen::MatrixXf Jt = J.transpose();
-        Eigen::MatrixXf JtJ = Jt * J; // A
-        Eigen::VectorXf b = -1 * Jt * R;
+            std::vector<float> v;
+            for (int p = 0; p < 72; p++)
+                v.push_back(0.5 * x(p));
+            for (int p = 0; p < 12 * 3; p++)
+                v[p] = 0;
+            for (int p = 0; p < 3; p++) {
+                v[20 * 3 + p] = 0;
+                v[21 * 3 + p] = 0;
+                v[22 * 3 + p] = 0;
+                v[23 * 3 + p] = 0;
+            }
+            if (k != 0)
+                for (int p = 12 * 3; p < 16 * 3; p++)
+                    v[p] = 0;
+            if (k != 1)
+                for (int p = 0; p < 3; p++) {
+                    v[16 * 3 + p] = 0;
+                    v[18 * 3 + p] = 0;
+                    v[20 * 3 + p] = 0;
+                }
+            if (k != 2)
+                for (int p = 0; p < 3; p++) {
+                    v[17 * 3 + p] = 0;
+                    v[19 * 3 + p] = 0;
+                    v[21 * 3 + p] = 0;
+                }
+            m_smpl_handler->AddTheta(v);
 
-        Eigen::LeastSquaresConjugateGradient<Eigen::MatrixXf> lscg;
-        lscg.compute(JtJ);
+            ComputeJacobian(live_vertex, cur_knn, r, j, stream);
+            float dist1 = count_dist(r);
 
-        std::cout << "eigen computed\n";
+            m_smpl_handler->SubTheta(v);
+            m_smpl_handler->SubTheta(v);
 
-        auto x = lscg.solve(b);
-        std::cout << "#iterations:     " << lscg.iterations() << std::endl;
-        std::cout << "estimated error: " << lscg.error()      << std::endl;
-        //from the eigen vector to the std vector
-        std::vector<float> v;
-        for (int i = 0; i < 82; i++)
-            v.push_back(x(i));
-        auto new_beta_theta = DeviceArray<float>(82);
-        new_beta_theta.upload(v);
-        auto bt = DeviceArrayView<float>(new_beta_theta);
-        smpl_handler->AddBetaTheta(bt);
+            ComputeJacobian(live_vertex, cur_knn, r, j, stream);
+            float dist2 = count_dist(r);
+            if (dist2 > dist1) {
+                m_smpl_handler->AddTheta(v);
+                m_smpl_handler->AddTheta(v);
+            }
+        }
     }
-
-    std::vector<float> old_beta, new_beta;
-    beta0.Download(old_beta);
-    smpl_handler->GetBeta().Download(new_beta);
-    std::cout << "old beta:";
-    for (int i = 0; i < 10; i++)
-        std::cout << old_beta[i] << " ";
-    std::cout << "\n";
-    std::cout << "new beta:";
-    for (int i = 0; i < 10; i++)
-        std::cout << new_beta[i] << " ";
-    std::cout << "\n";
-
-    std::vector<float> old_theta, new_theta;
-    theta0.Download(old_theta);
-    smpl_handler->GetTheta().Download(new_theta);
-    std::cout << "old theta:";
-    for (int i = 0; i < 72; i++)
-        std::cout << old_theta[i] << " ";
-    std::cout << "\n";
-    std::cout << "new theta:";
-    for (int i = 0; i < 72; i++)
-        std::cout << new_theta[i] << " ";
-    std::cout << "\n";
 }

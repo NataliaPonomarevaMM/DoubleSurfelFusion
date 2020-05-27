@@ -36,7 +36,8 @@ namespace surfelwarp {
                 vert[k] = coeffs[k * 4 + 3];
                 for (int t = 0; t < 3; t++)
                     vert[k] += coeffs[k * 4 + t] * restShape[j * 3 + t];
-                vert[k] /= homoW;
+                if (homoW != 0)
+                    vert[k] /= homoW;
             }
             vertices[j] = make_float3(vert[0], vert[1], vert[2]);
         }

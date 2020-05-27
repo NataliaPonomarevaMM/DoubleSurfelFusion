@@ -66,29 +66,15 @@ namespace surfelwarp {
             outer_jac[(idx % 3) * 3 + id4] += t4 / n;
             outer_jac[id4 * 3 + (idx % 3)] += t4 / n;
 
-            if (idx == 0) {
-                for (int i = 0; i < 9; i++)
-                    printf("%f ", outer[i]);
-                printf("\n");
-                for (int i = 0; i < 9; i++)
-                    printf("%f ", outer_jac[i]);
-                printf("\n");
-                for (int i = 0; i < 9; i++)
-                    printf("%f ", skew[i]);
-                printf("\n");
-                for (int i = 0; i < 9; i++)
-                    printf("%f ", skew_jac[i]);
-                printf("\n");
-            }
-
             for (int k = 0; k < 9; k++)
                 poseRotationJac[idx * 9 + k] = sin * cur_t * outer[k] + (1 - cos) * outer_jac[k]
                         + cos * cur_t * skew[k] + sin * skew_jac[k];
+            poseRotationJac[idx * 9 + 0] += -1 * sin * cur_t;
+            poseRotationJac[idx * 9 + 4] += -1 * sin * cur_t;
+            poseRotationJac[idx * 9 + 8] += -1 * sin * cur_t;
         }
 
         __global__ void LocalTransformJac(
-                const PtrSz<const float> joints,
-                const PtrSz<const int64_t> kinematicTree,
                 const PtrSz<const float> poseRotationJac,
                 PtrSz<float>localTransformations
         ) {
@@ -96,17 +82,15 @@ namespace surfelwarp {
             const int i = idx / 3;
             if (idx >= 72)
                 return;
-            //copy data from poseRotation
+            //copy data from poseRotationJac
             for (int k = 0; k < 3; k++)
                 for (int l = 0; l < 3; l++)
                     localTransformations[idx * 16 + k * 4 + l] = poseRotationJac[idx * 9 + k * 3 + l];
-            for (int l = 0; l < 3; l++)
+            for (int l = 0; l < 4; l++) {
                 localTransformations[idx * 16 + 3 * 4 + l] = 0;
-            // data from joints
-            int ancestor = kinematicTree[i];
-            for (int k = 0; k < 3; k++)
-                localTransformations[idx * 16 + k * 4 + 3] = i != 0 ? joints[i * 3 + k] - joints[ancestor * 3 + k] : joints[k];
-            localTransformations[idx * 16 + 3 * 4 + 3] = 1;
+                localTransformations[idx * 16 + l * 4 + 3] = 0;
+            }
+            //localTransformations[idx * 16 + 3 * 4 + 3] = 1;
         }
 
 
@@ -114,16 +98,14 @@ namespace surfelwarp {
                 const PtrSz<const float> localTransformations,
                 const PtrSz<const float> localTransformationsJac,
                 const PtrSz<const int64_t> kinematicTree,
-                const PtrSz<const float> joints,
                 const int jointnum,
-                PtrSz<float> globalTransformations
+                PtrSz<float> globalTransformations,
+                PtrSz<bool> not_null //72 * 24
         ) {
             const int idx = threadIdx.x; //0..72
             const int i = idx / 3;
 
-            bool not_null[24];
-
-            not_null[0] = (i == 0);
+            not_null[idx * 24 + 0] = (i == 0);
             for (int k = 0; k < 4; k++)
                 for (int l = 0; l < 4; l++)
                     globalTransformations[idx * 384 + k * 4 + l] =
@@ -132,7 +114,7 @@ namespace surfelwarp {
 
             for (int j = 1; j < jointnum; j++) {
                 int anc = kinematicTree[j];
-                not_null[j] = (not_null[anc] || i == j);
+                not_null[idx * 24 + j] = (not_null[idx * 24 + anc] || i == j);
                 for (int k = 0; k < 4; k++)
                     for (int l = 0; l < 4; l++) {
                         globalTransformations[idx * 384 + j * 16 + k * 4 + l] = 0;
@@ -143,21 +125,11 @@ namespace surfelwarp {
                                         localTransformations[j * 16 + t * 4 + l]);
                     }
             }
-            for (int j = 0; j < jointnum; j++) {
-                int anc = kinematicTree[j];
-                if (!not_null[j]) {
-                    for (int k = 0; k < 3; k++)
-                        for (int l = 0; l < 3; l++)
-                            globalTransformations[idx * 384 + j * 16 + k * 4 + l] = 0;
-                    for (int k = 0; k < 3; k++)
-                        globalTransformations[idx * 384 + j * 16 + k * 4 + 3] =
-                                j != 0 ? joints[j * 3 + k] - joints[anc * 3 + k] : joints[k];
-                }
-            }
         }
 
         __global__ void TransformJac(
                 const PtrSz<const float> joints,
+                const PtrSz<const bool> not_null,
                 PtrSz<float> globalTransformations
         ) {
             int j = blockIdx.x; //0..24
@@ -172,7 +144,12 @@ namespace surfelwarp {
                     elim[k] += globalTransformations[i * 384 + j * 16 + k * 4 + t] * joints[j * 3 + t];
             }
             for (int k = 0; k < 3; k++)
-                globalTransformations[i * 384 + j * 16 + k * 4 + 3] -= elim[k];
+                globalTransformations[i * 384 + j * 16 + k * 4 + 3] = -1 * elim[k];
+
+            if (!not_null[i * 24 + j])
+                for (int k = 0; k < 4; k++)
+                    for (int l = 0; l < 4; l++)
+                        globalTransformations[i * 384 + j * 16 + k * 4 + l] = 0;
         }
 
         __global__ void SkinningJac(
@@ -198,16 +175,14 @@ namespace surfelwarp {
                         coeffs[k * 4 + l] += weights[j * jointnum + t] *
                                 transformationJac[i * 384 + t * 16 + k * 4 + l];
 
-            float homoW = coeffs[15];
-            for (int t = 0; t < 3; t++)
-                homoW += coeffs[12 + t] * (templateRestShape[j * 3 + t] + shapeBlendShape[j * 3 + t]);
-
             float vert[3];
             for (int k = 0; k < 3; k++) {
-                vert[k] = coeffs[k * 4 + 3];
+                //vert[k] = coeffs[k * 4 + 3];
+                vert[k] = 0;
                 for (int t = 0; t < 3; t++)
                     vert[k] += coeffs[k * 4 + t] * (templateRestShape[j * 3 + t] + shapeBlendShape[j * 3 + t]);
-                vert[k] /= homoW;
+                if (coeffs[15] != 0)
+                    vert[k] /= coeffs[15];
             }
             verticesJac[j * 72 + i] = make_float3(vert[0], vert[1], vert[2]);
         }
@@ -235,37 +210,19 @@ namespace surfelwarp {
         skinning(globalTransformations, stream);
         countNormals(stream);
         transform(stream);
+        applyCameraTransform(stream);
 
         auto poseRotJac = DeviceArray<float>(72 * 9);
         device::countPoseRotJacobian<<<1,72,0,stream>>>(m__theta, poseRotJac);
         auto localTransformationsJac = DeviceArray<float>(72 * 16);
-        device::LocalTransformJac<<<1,72,0,stream>>>(joints, m__kinematicTree,
-                poseRotJac, localTransformationsJac);
+        device::LocalTransformJac<<<1,72,0,stream>>>(poseRotJac, localTransformationsJac);
         auto globalTransformationsJac = DeviceArray<float>(72 * JOINT_NUM * 16);
+        auto not_null = DeviceArray<bool>(72 * 24);
         device::GlobalTransformJac<<<1,72,0,stream>>>(localTransformations, localTransformationsJac,
-                m__kinematicTree, joints, JOINT_NUM, globalTransformationsJac);
-        device::TransformJac<<<JOINT_NUM,72,0,stream>>>(joints, globalTransformationsJac);
+                m__kinematicTree, JOINT_NUM, globalTransformationsJac, not_null);
+        device::TransformJac<<<JOINT_NUM,72,0,stream>>>(joints, not_null, globalTransformationsJac);
         device::SkinningJac<<<VERTEX_NUM,72,0,stream>>>(m__templateRestShape, shapeBlendShape,
                 globalTransformationsJac,  m__weights, JOINT_NUM, vertJac);
         cudaStreamSynchronize(stream);
-        auto error = cudaGetLastError();
-        if(error != cudaSuccess)
-        {
-            printf("CUDA error in jac: %s\n", cudaGetErrorString(error));
-            exit(-1);
-        }
-
-//        std::ofstream f("/home/nponomareva/surfelwarp/posejac.txt");
-//        std::vector<float> q;
-//        globalTransformationsJac.download(q);
-//        for (int i = 0; i < q.size(); i++) {
-//            f << q[i] << "\n";
-//        }
-////        std::vector<float3> q;
-////        vertJac.download(q);
-////        for (int i = 0; i < q.size(); i++) {
-////            f << q[i].x << " " << q[i].y << " " << q[i].z << "\n";
-////        }
-//        std::cout << "saved jac\n";
     }
 }

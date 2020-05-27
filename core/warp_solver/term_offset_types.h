@@ -183,14 +183,6 @@ namespace surfelwarp {
 			return;
 		}
 
-        pair_offset += 6 * offset.FeatureTermSize();
-        if(term_idx >= offset[3] && term_idx < offset[4]) {
-            type = TermType::Bind;
-            typed_idx = term_idx - offset[3];
-            nodepair_idx = pair_offset + 1 * typed_idx;
-            return;
-        }
-
 		//Not a valid term
 		type = TermType::Invalid;
 		typed_idx = 0xFFFFFFFF;

@@ -6,6 +6,12 @@
 #include "math/vector_ops.hpp"
 #include "common/Constants.h"
 
+#include <chrono>
+
+using mcs = std::chrono::microseconds;
+using ms = std::chrono::milliseconds;
+using clk = std::chrono::system_clock;
+
 namespace surfelwarp {
     void moveModel() {
         nlohmann::json model; // JSON object represents.
@@ -96,7 +102,6 @@ namespace surfelwarp {
         m__theta.upload(theta.data(), 72);
         m__beta.upload(beta.data(), 10);
 
-        m_pair_sorting = std::make_shared<PairsSorting>();
         m_dist.AllocateBuffer(Constants::kMaxNumSurfels * 4);
         m_onbody.AllocateBuffer(Constants::kMaxNumSurfels);
         m_knn.AllocateBuffer(Constants::kMaxNumSurfels);
@@ -126,10 +131,12 @@ namespace surfelwarp {
         countShapeBlendShape(shapeBlendShape, stream);
         countRestShape(shapeBlendShape, poseBlendShape, stream);
         regressJoints(shapeBlendShape, joints, stream);
+        cudaStreamSynchronize(stream);
         transform(poseRotation, joints, globalTransformations, localTransformations, stream);
 	    skinning(globalTransformations, stream);
         countNormals(stream);
         transform(stream);
+        applyCameraTransform(stream);
     }
 
     SMPL::SolverInput SMPL::SolverAccess(cudaStream_t stream) const

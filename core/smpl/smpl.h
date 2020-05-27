@@ -9,15 +9,12 @@
 #include "imgproc/ImageProcessor.h"
 #include "imgproc/frameio/VolumeDeformFileFetch.h"
 #include "core/SurfelGeometry.h"
-#include "core/volumetric/PairsSorting.h"
 
 namespace surfelwarp {
     class SMPL {
     private:
         DeviceArray<float> m__beta;
         DeviceArray<float> m__theta;
-        DeviceArray<float> m__beta0;
-        DeviceArray<float> m__theta0;
 
         ///constant
         DeviceArray<float> m__poseBlendBasis; // Basis of the pose-dependent shape space, (6890, 3, 207).
@@ -39,8 +36,7 @@ namespace surfelwarp {
         DeviceBufferArray<float4> m_knn_weight; // smpl knn weights for live vertices (m_num_marked)
         DeviceBufferArray<int> m_onbody; // is live vertex on body (live_vertex.size)
 
-        PairsSorting::Ptr m_pair_sorting;
-        mat34 init_mat;
+        mat34 init_mat = mat34::identity();
 
         void countPoseBlendShape(
                 DeviceArray<float> &poseRotation,
@@ -86,7 +82,7 @@ namespace surfelwarp {
                 cudaStream_t stream
         );
         void transform(cudaStream_t stream);
-        void countPoseJac(DeviceArray<float3> &vertJac,cudaStream_t stream);
+        void applyCameraTransform(cudaStream_t stream);
     public:
         using Ptr = std::shared_ptr<SMPL>;
         SMPL();
@@ -100,7 +96,7 @@ namespace surfelwarp {
                 int num_remaining_surfel,
                 int num_appended_surfel,
                 cudaStream_t stream = 0);
-        void CameraTransform(mat34 world2camera, cudaStream_t stream = 0);
+        void SetCameraTransform(mat34 world2camera);
 
         void SplitReferenceVertices(
                 const DeviceArrayView<float4>& live_vertex,
@@ -120,30 +116,17 @@ namespace surfelwarp {
         DeviceArrayView<float3> GetVertices() const { return  DeviceArrayView<float3>(m_smpl_vertices); }
         DeviceArrayView<float3> GetNormals() const { return  DeviceArrayView<float3>(m_smpl_normals); }
         DeviceArrayView<int> GetFaceIndices() const { return  DeviceArrayView<int>(m__faceIndices); }
-        DeviceArrayView<float> GetBeta() const {return DeviceArrayView<float>(m__beta); }
         DeviceArrayView<float> GetTheta() const {return DeviceArrayView<float>(m__theta);}
-        DeviceArrayView<float> GetBeta0() {
-            m__beta.copyTo(m__beta0);
-            return DeviceArrayView<float>(m__beta0);
-        }
-        DeviceArrayView<float> GetTheta0() {
-            m__theta.copyTo(m__theta0);
-            return DeviceArrayView<float>(m__theta0);
-        }
+        void AddTheta(std::vector<float> &to_add, cudaStream_t stream = 0);
+        void SubTheta(std::vector<float> &to_sub, cudaStream_t stream = 0);
 
         bool ShouldDoVolumetricOptimization() const {return m_num_marked > 0;}
-        void ComputeJacobian(
-                DeviceArrayView<float4> &live_vertex,
-                DeviceArrayView<float4> &live_normal,
-                DeviceArrayView<float> &beta0,
-                DeviceArrayView<float> &theta0,
-                float *r,
-                float *j,
-                cudaStream_t stream = 0
-        );
-        void AddBetaTheta(
-                DeviceArrayView<float> &to_add,
-                cudaStream_t stream = 0
+        void countPoseJac(DeviceArray<float3> &vertJac,cudaStream_t stream);
+        void count_dist_to_smpl(
+                const DeviceArrayView<float4> &live_vertex,
+                DeviceArray<int> &knn_ind,
+                DeviceArray<float> &dist,
+                cudaStream_t stream
         );
 
         void Transform(const surfelwarp::DeviceArrayView<float4> &live_vertex,cudaStream_t stream = 0);

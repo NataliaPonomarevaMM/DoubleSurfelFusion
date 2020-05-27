@@ -62,6 +62,6 @@ int main(int argc, char** argv) {
 	}
     sr /= config.num_frames();
     std::cout << "SR: " << sr << " ms" << std::endl;
-	
+
 	//destroyCudaContext(context);
 }

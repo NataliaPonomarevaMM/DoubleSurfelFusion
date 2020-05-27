@@ -74,6 +74,8 @@ if(UNIX)
     set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -g -G")
 endif(UNIX)
 
+set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -g -G")
+
 # Append "d" to library versions with debugging symbols
 set(CMAKE_DEBUG_POSTFIX d)
 

@@ -42,6 +42,19 @@ namespace surfelwarp {
             const auto ind = threadIdx.x + blockDim.x * blockIdx.x;
             if (ind >= normal.size)
                 return;
+//            vertex[ind] = world2camera.rot * vertex[ind] + world2camera.trans;
+//            normal[ind] = world2camera.rot * normal[ind];
+            vertex[ind].y = vertex[ind].y - world2camera.trans.y / 2;
+        }
+
+        __global__ void transform1(
+                PtrSz<float3> normal,
+                PtrSz<float3> vertex,
+                const mat34 world2camera
+        ) {
+            const auto ind = threadIdx.x + blockDim.x * blockIdx.x;
+            if (ind >= normal.size)
+                return;
 
             auto x = 0.993545 * vertex[ind].x + -0.0299532 * vertex[ind].y + 0.109421 * vertex[ind].z + 0.0068873;
             auto y = 0.0173843 * vertex[ind].x + 0.993324 * vertex[ind].y + 0.114065 * vertex[ind].z + 0.643488;
@@ -69,16 +82,20 @@ namespace surfelwarp {
         device::normalize_normal<<<grid, blk,0,stream>>>(m_smpl_normals);
     }
 
-    void SMPL::CameraTransform(mat34 world2camera, cudaStream_t stream) {
+    void SMPL::SetCameraTransform(mat34 world2camera) {
+        init_mat = world2camera;
+    }
+
+    void SMPL::applyCameraTransform(cudaStream_t stream) {
         dim3 blk = dim3(128);
         dim3 grid = dim3(divUp(VERTEX_NUM, blk.x));
-        device::transform<<<grid, blk,0,stream>>>(m_smpl_normals, m_smpl_vertices, world2camera);
+        device::transform<<<grid, blk,0,stream>>>(m_smpl_normals, m_smpl_vertices, init_mat);
     }
 
     void SMPL::transform(cudaStream_t stream) {
         dim3 blk = dim3(128);
         dim3 grid = dim3(divUp(VERTEX_NUM, blk.x));
-        device::transform<<<grid, blk,0,stream>>>(m_smpl_normals, m_smpl_vertices, init_mat);
+        device::transform1<<<grid, blk,0,stream>>>(m_smpl_normals, m_smpl_vertices, init_mat);
     }
 }
 

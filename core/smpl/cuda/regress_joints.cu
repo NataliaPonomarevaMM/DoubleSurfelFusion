@@ -19,14 +19,14 @@ namespace surfelwarp {
         }
 
         __global__ void RegressJoints2(
-                const PtrSz<const float> templateRestShape,
-                const PtrSz<const float> shapeBlendShape,
-                const PtrSz<const float> jointRegressor,
+                const float *templateRestShape,
+                const float *shapeBlendShape,
+                const float *jointRegressor,
                 const int vertexnum,
-                PtrSz<float> joints
+                float * joints
         ) {
             const auto ind = threadIdx.x + blockDim.x * blockIdx.x;
-            if (ind >= joints.size)
+            if (ind >= 72)
                 return;
 
 		    const auto j = ind / 3;
@@ -54,9 +54,9 @@ namespace surfelwarp {
             DeviceArray<float> &joints,
             cudaStream_t stream
     ) {
-        dim3 blk(128);
-        dim3 grid(divUp(VERTEX_NUM * 3, blk.x));
-        device::RegressJoints2<<<grid, blk,0,stream>>>(m__templateRestShape,
-                shapeBlendShape, m__jointRegressor, VERTEX_NUM, joints);
+//        dim3 blk(128);
+//        dim3 grid(divUp(JOINT_NUM * 3, blk.x));
+        device::RegressJoints2<<<JOINT_NUM, 3,0,stream>>>(m__templateRestShape.ptr(),
+                shapeBlendShape.ptr(), m__jointRegressor.ptr(), VERTEX_NUM, joints.ptr());
     }
 }

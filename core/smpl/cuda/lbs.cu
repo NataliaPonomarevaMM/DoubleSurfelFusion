@@ -23,7 +23,7 @@ using clk = std::chrono::system_clock;
 namespace surfelwarp {
     namespace device {
         __global__ void mark(
-                const float* dist,
+                const float *dist,
                 const int live_size,
                 const float squared_max_dist,
                 PtrSz<unsigned> marked
@@ -56,7 +56,7 @@ namespace surfelwarp {
         __global__ void fill_index(
                 const PtrSz<const unsigned> on_body,
                 PtrSz<int> reverse_onbody_ind,
-                int* onbody_ind
+                int *onbody_ind
         ) {
             int on = 0;
             for (int i = 0; i < on_body.size; i++) {
@@ -73,8 +73,8 @@ namespace surfelwarp {
                 const PtrSz<const float> dist,
                 const PtrSz<const int> reverse_onbody,
                 const PtrSz<const int> knn_ind,
-                ushort4* knn,
-                float4* weights
+                ushort4 *knn,
+                float4 *weights
         ) {
             const auto i = threadIdx.x + blockDim.x * blockIdx.x;
             if (i >= reverse_onbody.size)
@@ -83,10 +83,10 @@ namespace surfelwarp {
             const int num = dist.size / 4;
             auto cur_ind = reverse_onbody[i];
             knn[i] = make_ushort4(knn_ind[0 * num + cur_ind], knn_ind[1 * num + cur_ind],
-                    knn_ind[2 * num + cur_ind], knn_ind[3 * num + cur_ind]);
+                                  knn_ind[2 * num + cur_ind], knn_ind[3 * num + cur_ind]);
 
             float4 weight;
-            weight.x = __expf(-dist[0 * num + cur_ind]/ (2 * d_node_radius_square));
+            weight.x = __expf(-dist[0 * num + cur_ind] / (2 * d_node_radius_square));
             weight.y = __expf(-dist[1 * num + cur_ind] / (2 * d_node_radius_square));
             weight.z = __expf(-dist[2 * num + cur_ind] / (2 * d_node_radius_square));
             weight.w = __expf(-dist[3 * num + cur_ind] / (2 * d_node_radius_square));
@@ -124,7 +124,7 @@ namespace surfelwarp {
     }
 
     unsigned SMPL::count_dist(
-            const DeviceArrayView<float4>& live_vertex,
+            const DeviceArrayView<float4> &live_vertex,
             DeviceArray<unsigned> &marked,
             DeviceArray<float> &dist,
             DeviceArray<int> &knn_ind,
@@ -134,22 +134,22 @@ namespace surfelwarp {
         auto cur_live_vert = DeviceArray<float>(live_vertex.Size() * 3);
         dim3 blk(256);
         dim3 grid(divUp(live_vertex.Size(), blk.x));
-        device::copy_live_vert<<<grid,blk,0,stream>>>(live_vertex, cur_live_vert.ptr());
+        device::copy_live_vert << < grid, blk, 0, stream >> > (live_vertex, cur_live_vert.ptr());
         dim3 blk2(256);
         dim3 grid2(divUp(VERTEX_NUM, blk.x));
-        device::copy_smpl_vert<<<grid2,blk2,0,stream>>>(m_smpl_vertices, cur_smpl_vert.ptr());
+        device::copy_smpl_vert << < grid2, blk2, 0, stream >> > (m_smpl_vertices, cur_smpl_vert.ptr());
         knn_cuda_texture(cur_smpl_vert, VERTEX_NUM, cur_live_vert, live_vertex.Size(), 3, 4, dist.ptr(), knn_ind.ptr());
 
         cudaMemset(marked.ptr(), 0, sizeof(unsigned) * live_vertex.Size());
         dim3 blk3(256);
         dim3 grid3(divUp(4 * live_vertex.Size(), blk.x));
-        device::mark<<<grid3,blk3,0,stream>>>(dist.ptr(), live_vertex.Size(),
+        device::mark << < grid3, blk3, 0, stream >> > (dist.ptr(), live_vertex.Size(),
                 5.0f * Constants::kNodeRadius, marked);
         //Prefix sum
         PrefixSum pref_sum;
         unsigned num = 0;
         pref_sum.InclusiveSum(marked, stream);
-        const auto& prefixsum_label = pref_sum.valid_prefixsum_array;
+        const auto &prefixsum_label = pref_sum.valid_prefixsum_array;
         cudaSafeCall(cudaMemcpyAsync(
                 &num,
                 prefixsum_label.ptr() + prefixsum_label.size() - 1,
@@ -171,20 +171,19 @@ namespace surfelwarp {
             cudaStream_t stream
     ) {
         auto reverse_onbody = DeviceArray<int>(num_marked);
-        device::fill_index<<<1,1,0,stream>>>(marked, reverse_onbody, onbody.ptr());
+        device::fill_index << < 1, 1, 0, stream >> > (marked, reverse_onbody, onbody.ptr());
 
         //find 4 nearest neighbours
         if (num_marked > 0) {
             dim3 blk(256);
             dim3 grid(divUp(num_marked, blk.x));
-            device::copyKNN<<<grid,blk,0,stream>>>(dist, reverse_onbody, knn_ind, knn.ptr(), knn_weight.ptr());
+            device::copyKNN << < grid, blk, 0, stream >> > (dist, reverse_onbody, knn_ind, knn.ptr(), knn_weight.ptr());
         }
     }
 
     void SMPL::CountKnn(
             const surfelwarp::DeviceArrayView<float4> &live_vertex,
-            cudaStream_t stream)
-    {
+            cudaStream_t stream) {
         const int lsize = live_vertex.Size();
         m_dist.ResizeArrayOrException(lsize * 4);
         m_onbody.ResizeArrayOrException(lsize);
@@ -199,15 +198,14 @@ namespace surfelwarp {
         auto cur_knn = m_knn.Array();
         auto cur_knn_weight = m_knn_weight.Array();
         count_knn(cur_dist, marked, knn_ind, m_num_marked, cur_onbody,
-                cur_knn, cur_knn_weight, stream);
+                  cur_knn, cur_knn_weight, stream);
     }
 
     void SMPL::CountAppendedKnn(
-            const DeviceArrayView<float4>& appended_live_vertex,
+            const DeviceArrayView<float4> &appended_live_vertex,
             int num_remaining_surfel,
             int num_appended_surfel,
-            cudaStream_t stream)
-    {
+            cudaStream_t stream) {
         if (appended_live_vertex.Size() == 0)
             return;
 
@@ -234,15 +232,35 @@ namespace surfelwarp {
     }
 
     void SMPL::SplitReferenceVertices(
-            const DeviceArrayView<float4>& live_vertex,
-            const DeviceArrayView<float4>& reference_vertex,
-            DeviceArray<float4>& onbody_points,
-            DeviceArray<float4>& farbody_points,
+            const DeviceArrayView<float4> &live_vertex,
+            const DeviceArrayView<float4> &reference_vertex,
+            DeviceArray<float4> &onbody_points,
+            DeviceArray<float4> &farbody_points,
             cudaStream_t stream
     ) {
         onbody_points = DeviceArray<float4>(m_num_marked);
         farbody_points = DeviceArray<float4>(reference_vertex.Size() - m_num_marked);
-        device::copy_body_nodes<<<1,1,0,stream>>>(reference_vertex, m_onbody.Ptr(),
+        device::copy_body_nodes << < 1, 1, 0, stream >> > (reference_vertex, m_onbody.Ptr(),
                 onbody_points, farbody_points);
+    }
+
+
+    void SMPL::count_dist_to_smpl(
+            const DeviceArrayView<float4> &live_vertex,
+            DeviceArray<int> &knn_ind,
+            DeviceArray<float> &dist,
+            cudaStream_t stream
+    ) {
+        auto cur_smpl_vert = DeviceArray<float>(VERTEX_NUM * 3);
+        auto cur_live_vert = DeviceArray<float>(live_vertex.Size() * 3);
+        dim3 blk(256);
+        dim3 grid(divUp(live_vertex.Size(), blk.x));
+        device::copy_live_vert<<<grid, blk, 0, stream>>>(live_vertex, cur_live_vert.ptr());
+        dim3 grid2(divUp(VERTEX_NUM, blk.x));
+        device::copy_smpl_vert<<<grid2, blk, 0, stream>>>(m_smpl_vertices, cur_smpl_vert.ptr());
+
+        knn_cuda_texture(cur_live_vert, live_vertex.Size(), cur_smpl_vert, VERTEX_NUM,
+                         3, 1, dist.ptr(), knn_ind.ptr());
+        cudaStreamSynchronize(0);
     }
 }

@@ -537,11 +537,12 @@ void surfelwarp::Visualizer::SaveMatchedCloudPair(
         float z = h_cloud_1[i].z * 0.001;
         Eigen::Vector4f transed_point4(x, y, z, 1.0);
         transed_point4 = from1To2 * transed_point4;
-        float3 transed_point;
-        transed_point.x = transed_point4(0) * 1000;
-        transed_point.y = transed_point4(1) * 1000;
-        transed_point.z = transed_point4(2) * 1000;
+        float3 transed_point = make_float3(h_cloud_1[i].x, h_cloud_1[i].y, h_cloud_1[i].z);
+//        transed_point.x = transed_point4(0) * 1000;
+//        transed_point.y = transed_point4(1) * 1000;
+//        transed_point.z = transed_point4(2) * 1000;
         trans_cloud_1.push_back(transed_point);
+
     }
     SaveColoredPointCloud(trans_cloud_1, make_uchar3(245, 0, 0), cloud_1_name);
     SaveColoredPointCloud(h_cloud_2, make_uchar3(200, 200, 200), cloud_2_name);

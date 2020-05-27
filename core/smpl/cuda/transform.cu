@@ -9,7 +9,7 @@ namespace surfelwarp {
         __global__ void LocalTransform(
                 const PtrSz<const float> joints,
                 const PtrSz<const int64_t> kinematicTree,
-                const PtrSz<const float>poseRotation,
+                const PtrSz<const float> poseRotation,
                 PtrSz<float>localTransformations
         ) {
             int i = threadIdx.x;
