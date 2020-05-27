@@ -1,4 +1,4 @@
-# [DoubleSurfelFusion]
+# DoubleSurfelFusion
 
 DoubleSurfelFusion is a dynamic reconstruction of human.
 
