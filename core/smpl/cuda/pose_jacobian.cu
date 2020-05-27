@@ -210,7 +210,6 @@ namespace surfelwarp {
         skinning(globalTransformations, stream);
         countNormals(stream);
         transform(stream);
-        applyCameraTransform(stream);
 
         auto poseRotJac = DeviceArray<float>(72 * 9);
         device::countPoseRotJacobian<<<1,72,0,stream>>>(m__theta, poseRotJac);

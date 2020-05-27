@@ -439,6 +439,7 @@ void surfelwarp::Visualizer::SaveSMPLCloud(
         const auto point = h_cloud[i];
         file_output << 'v' << ' '
                     << point.x << ' '
+                    << point.x << ' '
                     << point.y << ' '
                     << point.z << std::endl;
     }
@@ -554,7 +555,6 @@ void surfelwarp::Visualizer::SaveMatchedCloudPair(
         const Eigen::Matrix4f &from1To2,
         const std::string &cloud_1_name, const std::string &cloud_2_name
 ) {
-	std::cout << "s1\n";
     SaveMatchedCloudPair(
             cloud_1,
             DeviceArray<float4>((float4 *) cloud_2.RawPtr(), cloud_2.Size()),

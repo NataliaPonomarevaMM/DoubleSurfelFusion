@@ -325,12 +325,12 @@ namespace surfelwarp { namespace device {
 					fillChannelledJtJToSharedBlock(channelled_jacobian, shared_blks, constants.SmoothSquared());
 				}
 				break;
-//                case TermType::Bind:
-//                {
-//                    float channelled_jacobian[18] = { 0 };
-//                    computeJtJDiagonalJacobian(term2jacobian.bind_term, node_idx, typed_term_idx, channelled_jacobian);
-//                    fillChannelledJtJToSharedBlock(channelled_jacobian, shared_blks, constants.BindSquared());
-//                }
+                case TermType::Bind:
+                {
+                    float channelled_jacobian[18] = { 0 };
+                    computeJtJDiagonalJacobian(term2jacobian.bind_term, node_idx, typed_term_idx, channelled_jacobian);
+                    fillChannelledJtJToSharedBlock(channelled_jacobian, shared_blks, constants.BindSquared());
+                }
                 break;
 				case TermType::Foreground:
 				{

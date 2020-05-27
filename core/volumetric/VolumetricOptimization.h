@@ -23,8 +23,7 @@ namespace surfelwarp {
     class VolumetricOptimization {
     private:
         SMPL::Ptr m_smpl_handler;
-        DeviceArray<int> d_body, d_left_arm, d_right_arm;
-        DeviceArray<int> m_knn_body, m_knn_left_arm, m_knn_right_arm;
+        DeviceArray<int> m_knn;
         DeviceArray<float4> m_right_vert;
 
         void CheckPoints(
@@ -33,9 +32,12 @@ namespace surfelwarp {
         );
         void ComputeJacobian(
                 DeviceArrayView<float4> &live_vertex,
-                DeviceArray<int> &knn_ind,
-                float *r,
                 float *j,
+                cudaStream_t stream
+        );
+        void ComputeResidual(
+                DeviceArrayView<float4> &live_vertex,
+                float *r,
                 cudaStream_t stream
         );
     public:

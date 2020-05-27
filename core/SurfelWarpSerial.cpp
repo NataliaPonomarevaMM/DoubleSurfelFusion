@@ -14,13 +14,6 @@
 
 #include <thread>
 #include <fstream>
-#include <cstdlib>
-#include <chrono>
-
-using mcs = std::chrono::microseconds;
-using ms = std::chrono::milliseconds;
-using clk = std::chrono::system_clock;
-
 
 surfelwarp::SurfelWarpSerial::SurfelWarpSerial() {
     //The config is assumed to be updated
@@ -93,34 +86,14 @@ void surfelwarp::SurfelWarpSerial::ProcessFirstFrame() {
     auto live_vertex = m_surfel_geometry[m_updated_geometry_index]->LiveVertexConfidence();
 
     m_smpl_model->LbsModel();
+    m_smpl_model->Transform(live_vertex);
     m_volumetric_optimization->Initialize(m_smpl_model, live_vertex);
-
-//    begin = clk::now();
-//    m_smpl_model->Transform(live_vertex);
-//    end = clk::now();
-//    time = std::chrono::duration_cast<ms>(end - begin);
-//    std::cout << "2) transform time " << (double)time.count() << std::endl;
-
-    auto begin = clk::now();
     m_smpl_model->CountKnn(live_vertex);
-    auto end = clk::now();
-    auto time = std::chrono::duration_cast<ms>(end - begin);
-    std::cout << "3) count knn time " << (double)time.count() << std::endl;
 
 	//Build the reference vertex and SE3 for the warp field
 	const auto reference_vertex = m_surfel_geometry[m_updated_geometry_index]->ReferenceVertexConfidence();
     DeviceArray<float4> onbody, farbody;
     m_smpl_model->SplitReferenceVertices(live_vertex, reference_vertex, onbody, farbody);
-
-
-    const auto& save_dir = createOrGetDataDirectory(m_frame_idx);
-	const std::string smpl_cloud_name = (save_dir / "smpl.obj").string();
-    const std::string onbody_name = (save_dir / "onbody.obj").string();
-    const std::string farbody_name = (save_dir / "farbody.obj").string();
-	Visualizer::SaveSMPLCloud(m_smpl_model->GetVertices(),m_smpl_model->GetFaceIndices(), smpl_cloud_name);
-    Visualizer::SaveCloud(DeviceArrayView<float4>(onbody), onbody_name);
-    Visualizer::SaveCloud(DeviceArrayView<float4>(farbody), farbody_name);
-	std::cout << "saved\n";
 
     m_warpfield_initializer->InitializeReferenceNodeAndSE3FromVertex(
 		DeviceArrayView<float4>(onbody), DeviceArrayView<float4>(farbody), m_warp_field);
@@ -173,12 +146,6 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 	m_rigid_solver->SetInputMaps(solver_maps, observation, m_camera.GetWorld2Camera());
 	const mat34 solved_world2camera = m_rigid_solver->Solve();
 	m_camera.SetWorld2Camera(solved_world2camera);
-
-	m_smpl_model->SetCameraTransform(m_camera.GetCamera2World());
-	m_smpl_model->LbsModel();
-
-//	auto cam = m_camera.GetCamera2World();
-//	std::cout << "  camera: " << cam.trans.x << " " << cam.trans.y << " " << cam.trans.z << "\n";
 
 	//The resource from geometry attributes
 	const auto solver_geometry = m_surfel_geometry[m_updated_geometry_index]->SolverAccess();
@@ -233,8 +200,6 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 
 	//Depends on should do reinit or integrate
 	if(use_reinit) {
-
-	    std::cout << "use reinit\n";
 		//First setup the idx
 		m_reinit_frame_idx = m_frame_idx;
 		fused_geometry_idx = (m_updated_geometry_index + 1) % 2;
@@ -295,8 +260,6 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 		//m_live_geometry_updater->ProcessFusionSerial(num_remaining_surfel, num_appended_surfel);
 		m_live_geometry_updater->ProcessFusionStreamed(num_remaining_surfel, num_appended_surfel);
 
-		std::cout << "remaining: " << num_remaining_surfel << ", appended: " << num_appended_surfel <<"\n";
-
 		//Do a inverse warping
 		SurfelNodeDeformer::InverseWarpSurfels(*m_warp_field, *m_surfel_geometry[fused_geometry_idx], solved_se3);
 
@@ -351,7 +314,6 @@ void surfelwarp::SurfelWarpSerial::ProcessNextFrameWithReinit(bool offline_save)
 		auto ref_geom = m_surfel_geometry[fused_geometry_idx]->ReferenceVertexConfidence();
         const std::string smpl_cloud_name = (save_dir / "ref.obj").string();
         Visualizer::SaveCloud(ref_geom, smpl_cloud_name);
-        std::cout << "saved\n";
 
         saveCorrespondedCloud(observation, fused_geometry_idx,
                               m_smpl_model->GetVertices(),

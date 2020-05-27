@@ -46,19 +46,8 @@ namespace surfelwarp {
         icp.setConvergenceTolerance(0.0001f).setMaxNumberOfIterations(500);
 
         cilantro::RigidTransform3f tf_est = icp.estimate().getTransform().inverse();
-        std::cout << "Iterations performed: " << icp.getNumberOfPerformedIterations() << std::endl;
-        std::cout << "Has converged: " << icp.hasConverged() << std::endl;;
-        std::cout << "matrix: " << tf_est.matrix() << "\n";
         init_mat = mat34(tf_est.matrix());
-
-        //transform(stream);
+        transform(stream);
         cudaStreamSynchronize(stream);
-        auto error = cudaGetLastError();
-        if(error != cudaSuccess)
-        {
-            // print the CUDA error message and exit
-            printf("rigid) CUDA error: %s\n", cudaGetErrorString(error));
-            exit(-1);
-        }
     }
 }

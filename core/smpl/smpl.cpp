@@ -136,7 +136,6 @@ namespace surfelwarp {
 	    skinning(globalTransformations, stream);
         countNormals(stream);
         transform(stream);
-        applyCameraTransform(stream);
     }
 
     SMPL::SolverInput SMPL::SolverAccess(cudaStream_t stream) const

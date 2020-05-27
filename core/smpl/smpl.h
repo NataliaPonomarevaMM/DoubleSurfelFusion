@@ -82,7 +82,6 @@ namespace surfelwarp {
                 cudaStream_t stream
         );
         void transform(cudaStream_t stream);
-        void applyCameraTransform(cudaStream_t stream);
     public:
         using Ptr = std::shared_ptr<SMPL>;
         SMPL();
@@ -96,7 +95,6 @@ namespace surfelwarp {
                 int num_remaining_surfel,
                 int num_appended_surfel,
                 cudaStream_t stream = 0);
-        void SetCameraTransform(mat34 world2camera);
 
         void SplitReferenceVertices(
                 const DeviceArrayView<float4>& live_vertex,
