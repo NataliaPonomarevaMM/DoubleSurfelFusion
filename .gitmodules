@@ -1,0 +1,3 @@
+[submodule "im2smpl"]
+	path = im2smpl
+	url = https://github.com/ZhengZerong/im2smpl.git
